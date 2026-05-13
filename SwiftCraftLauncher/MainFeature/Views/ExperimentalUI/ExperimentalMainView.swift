@@ -39,6 +39,7 @@ struct ExperimentalMainView: View {
     var body: some View {
         contentForTab
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .ignoresSafeArea(.all)
             .environmentObject(filterState)
             .environmentObject(detailState)
             .toolbar {
@@ -60,6 +61,7 @@ struct ExperimentalMainView: View {
                     UserAvatarButton()
                 }
             }
+            .toolbarBackground(.hidden, for: .windowToolbar)
     }
 
     @ViewBuilder private var contentForTab: some View {
