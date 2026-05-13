@@ -55,6 +55,12 @@ class GeneralSettingsManager: ObservableObject, WorkingPathProviding {
         didSet { objectWillChange.send() }
     }
 
+    /// 是否启用试验性 UI（仿 Apple Game 应用风格，需重启生效）
+    @AppStorage(AppConstants.UserDefaultsKeys.useExperimentalUI)
+    var useExperimentalUI: Bool = false {
+        didSet { objectWillChange.send() }
+    }
+
     private init() {}
 
     /// 当前启动器工作目录（WorkingPathProviding）

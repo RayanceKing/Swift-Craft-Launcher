@@ -15,6 +15,7 @@ public struct GeneralSettingsView: View {
         Form {
             GeneralSettingsLanguageRow()
             GeneralSettingsInterfaceLayoutRow(generalSettings: generalSettings)
+            GeneralSettingsExperimentalUIRow(generalSettings: generalSettings)
             GeneralSettingsWorkingDirectoryRow(
                 generalSettings: generalSettings,
                 viewModel: viewModel,
