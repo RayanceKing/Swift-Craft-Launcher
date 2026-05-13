@@ -64,9 +64,9 @@ struct MinecraftFriendsSheetView: View {
                                 )
                             }
                         }
+                        .frame(maxWidth: 400)
                     }
                 }
-                .frame(maxWidth: 600)
             },
             footer: {
                 HStack {
