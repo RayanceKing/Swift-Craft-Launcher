@@ -10,7 +10,9 @@ public struct ContentToolbarView: ToolbarContent {
     @State private var showingGameForm = false
     @EnvironmentObject private var gameRepository: GameRepository
     @State private var showEditSkin = false
+    @State private var showingMinecraftFriendsSheet = false
     @StateObject private var viewModel = ContentToolbarViewModel()
+    @StateObject private var minecraftFriendsSheetViewModel = MinecraftFriendsSheetViewModel()
     private let minecraftAuthService: MinecraftAuthService
     private let yggdrasilAuthService: YggdrasilAuthService
     private let premiumAccountFlagManager: PremiumAccountFlagManager
@@ -35,6 +37,11 @@ public struct ContentToolbarView: ToolbarContent {
     /// 是否为在线账户（计算属性）
     private var isCurrentPlayerOnline: Bool {
         currentPlayer?.isOnlineAccount ?? false
+    }
+
+    private var canUseMinecraftServicesFriends: Bool {
+        guard let p = currentPlayer, p.isOnlineAccount else { return false }
+        return OfflineUserServerMap.serverKey(for: p.id) == nil
     }
 
     public var body: some ToolbarContent {
@@ -144,6 +151,31 @@ public struct ContentToolbarView: ToolbarContent {
                     )
                     .onDisappear {
                         viewModel.clearPreloadedSkinData()
+                    }
+                }
+
+                if canUseMinecraftServicesFriends {
+                    Button {
+                        Task {
+                            guard let p = currentPlayer else { return }
+                            await minecraftFriendsSheetViewModel.load(player: p, forceRefresh: false)
+                            guard !Task.isCancelled, currentPlayer?.id == p.id else { return }
+                            showingMinecraftFriendsSheet = true
+                        }
+                    } label: {
+                        if minecraftFriendsSheetViewModel.isLoading, !showingMinecraftFriendsSheet {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Label("minecraft.friends.toolbar.title".localized(), systemImage: "person.2")
+                        }
+                    }
+                    .help("minecraft.friends.toolbar.help".localized())
+                    .disabled(minecraftFriendsSheetViewModel.isLoading && !showingMinecraftFriendsSheet)
+                    .sheet(isPresented: $showingMinecraftFriendsSheet) {
+                        if let p = currentPlayer {
+                            MinecraftFriendsSheetView(player: p, viewModel: minecraftFriendsSheetViewModel)
+                        }
                     }
                 }
             }

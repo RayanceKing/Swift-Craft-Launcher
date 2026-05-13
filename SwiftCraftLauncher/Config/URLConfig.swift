@@ -95,11 +95,15 @@ enum URLConfig {
             static let minecraftProfileSkins = URLConfig.url("https://api.minecraftservices.com/minecraft/profile/skins")
             static let minecraftProfileActiveSkin = URLConfig.url("https://api.minecraftservices.com/minecraft/profile/skins/active")
             static let minecraftProfileActiveCape = URLConfig.url("https://api.minecraftservices.com/minecraft/profile/capes/active")
+            static let minecraftFriends = URLConfig.url("https://api.minecraftservices.com/friends")
+            static let minecraftPresence = URLConfig.url("https://api.minecraftservices.com/presence")
+            static let minecraftPlayerAttributes = URLConfig.url("https://api.minecraftservices.com/player/attributes")
         }
 
         // Minecraft API
         enum Minecraft {
             static let versionList = URLConfig.url("https://launchermeta.mojang.com/mc/game/version_manifest.json")
+            static let mojangSessionProfileBase = URLConfig.url("https://sessionserver.mojang.com/session/minecraft/profile/")
         }
 
         /// Minecraft 新闻文章链接生成
