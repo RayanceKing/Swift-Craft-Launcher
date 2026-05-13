@@ -29,33 +29,14 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        var resolved = player
-        if resolved.credential == nil {
-            resolved.credential = dataManager.loadCredential(userId: resolved.id)
-        }
-        guard !resolved.authAccessToken.isEmpty else {
-            uiData = .empty
-            skinTextureURLByUUID = [:]
-            errorHandler.handle(
-                GlobalError.authentication(
-                    chineseMessage: "缺少 Minecraft 访问令牌，请重新登录该正版账号",
-                    i18nKey: "error.authentication.missing_token",
-                    level: .notification
-                )
-            )
-            return
-        }
-
-        var tokenPlayer = resolved
-        do {
-            tokenPlayer = try await authService.validateAndRefreshPlayerTokenThrowing(for: resolved)
-            if tokenPlayer.authAccessToken != resolved.authAccessToken {
-                persistPlayerIfNeeded(tokenPlayer)
+        guard let tokenPlayer = await preparedTokenPlayer(
+            for: player,
+            onMissingCredential: {
+                uiData = .empty
+                skinTextureURLByUUID = [:]
+                reportMissingAccessToken()
             }
-        } catch {
-            errorHandler.handle(GlobalError.from(error))
-            return
-        }
+        ) else { return }
 
         do {
             uiData = try await friendsService.fetchFriendsAndPresence(
@@ -75,83 +56,55 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
     func sendFriendRequest(player: Player) async {
         let name = addFriendName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !name.isEmpty else { return }
-        await mutate(player: player) {
-            try await friendsService.performFriendAction(
-                accessToken: $0,
-                request: MinecraftFriendActionRequest(name: name, profileId: nil, updateType: .add)
-            )
-        }
+        await runFriendMutation(
+            player: player,
+            request: MinecraftFriendActionRequest(name: name, profileId: nil, updateType: .add)
+        )
         addFriendName = ""
     }
 
     func acceptIncoming(player: Player, profileId: String) async {
-        await mutate(player: player) {
-            try await friendsService.performFriendAction(
-                accessToken: $0,
-                request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .add)
-            )
-        }
+        await runFriendMutation(
+            player: player,
+            request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .add)
+        )
     }
 
     func declineIncoming(player: Player, profileId: String) async {
-        await mutate(player: player) {
-            try await friendsService.performFriendAction(
-                accessToken: $0,
-                request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .remove)
-            )
-        }
+        await runFriendMutation(
+            player: player,
+            request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .remove)
+        )
     }
 
     func revokeOutgoing(player: Player, profileId: String) async {
-        await mutate(player: player) {
-            try await friendsService.performFriendAction(
-                accessToken: $0,
-                request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .remove)
-            )
-        }
+        await runFriendMutation(
+            player: player,
+            request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .remove)
+        )
     }
 
     func removeFriend(player: Player, profileId: String) async {
-        await mutate(player: player) {
-            try await friendsService.performFriendAction(
-                accessToken: $0,
-                request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .remove)
-            )
+        await runFriendMutation(
+            player: player,
+            request: MinecraftFriendActionRequest(name: nil, profileId: profileId, updateType: .remove)
+        )
+    }
+
+    private func runFriendMutation(player: Player, request: MinecraftFriendActionRequest) async {
+        await mutate(player: player) { token in
+            _ = try await friendsService.performFriendAction(accessToken: token, request: request)
         }
     }
 
-    private func mutate(player: Player, action: (String) async throws -> MinecraftFriendsListResponse) async {
-        var resolved = player
-        if resolved.credential == nil {
-            resolved.credential = dataManager.loadCredential(userId: resolved.id)
-        }
-        guard !resolved.authAccessToken.isEmpty else {
-            errorHandler.handle(
-                GlobalError.authentication(
-                    chineseMessage: "缺少 Minecraft 访问令牌，请重新登录该正版账号",
-                    i18nKey: "error.authentication.missing_token",
-                    level: .notification
-                )
-            )
-            return
-        }
+    private func mutate(player: Player, action: (String) async throws -> Void) async {
+        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: reportMissingAccessToken) else { return }
 
         isLoading = true
         defer { isLoading = false }
 
-        var tokenPlayer = resolved
         do {
-            tokenPlayer = try await authService.validateAndRefreshPlayerTokenThrowing(for: resolved)
-            if tokenPlayer.authAccessToken != resolved.authAccessToken {
-                persistPlayerIfNeeded(tokenPlayer)
-            }
-        } catch {
-            errorHandler.handle(GlobalError.from(error))
-            return
-        }
-
-        do {
-            _ = try await action(tokenPlayer.authAccessToken)
+            try await action(tokenPlayer.authAccessToken)
             uiData = try await friendsService.fetchFriendsAndPresence(
                 accessToken: tokenPlayer.authAccessToken,
                 forceRefresh: true
@@ -160,6 +113,38 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
         } catch {
             errorHandler.handle(GlobalError.from(error))
         }
+    }
+
+    private func preparedTokenPlayer(for player: Player, onMissingCredential: () -> Void) async -> Player? {
+        var resolved = player
+        if resolved.credential == nil {
+            resolved.credential = dataManager.loadCredential(userId: resolved.id)
+        }
+        guard !resolved.authAccessToken.isEmpty else {
+            onMissingCredential()
+            return nil
+        }
+
+        do {
+            let tokenPlayer = try await authService.validateAndRefreshPlayerTokenThrowing(for: resolved)
+            if tokenPlayer.authAccessToken != resolved.authAccessToken {
+                persistPlayerIfNeeded(tokenPlayer)
+            }
+            return tokenPlayer
+        } catch {
+            errorHandler.handle(GlobalError.from(error))
+            return nil
+        }
+    }
+
+    private func reportMissingAccessToken() {
+        errorHandler.handle(
+            GlobalError.authentication(
+                chineseMessage: "缺少 Minecraft 访问令牌，请重新登录该正版账号",
+                i18nKey: "error.authentication.missing_token",
+                level: .notification
+            )
+        )
     }
 
     private func prefetchSkinTextureURLs(for data: MinecraftFriendsUIData) async {

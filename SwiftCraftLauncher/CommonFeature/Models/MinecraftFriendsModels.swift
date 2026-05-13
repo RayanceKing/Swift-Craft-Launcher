@@ -34,13 +34,6 @@ struct MinecraftFriendsListResponse: Codable, Equatable, Sendable {
         incomingRequests = try c.decodeIfPresent([MinecraftFriendProfileDTO].self, forKey: .incomingRequests) ?? []
         outgoingRequests = try c.decodeIfPresent([MinecraftFriendProfileDTO].self, forKey: .outgoingRequests) ?? []
     }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(friends, forKey: .friends)
-        try c.encode(incomingRequests, forKey: .incomingRequests)
-        try c.encode(outgoingRequests, forKey: .outgoingRequests)
-    }
 }
 
 // MARK: - Friend actions
@@ -54,19 +47,6 @@ struct MinecraftFriendActionRequest: Encodable {
         self.name = name
         self.profileId = profileId
         self.updateType = updateType.rawValue
-    }
-
-    private enum CodingKeys: String, CodingKey {
-        case name
-        case profileId
-        case updateType
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(updateType, forKey: .updateType)
-        try c.encodeIfPresent(name, forKey: .name)
-        try c.encodeIfPresent(profileId, forKey: .profileId)
     }
 }
 
@@ -101,33 +81,11 @@ struct MinecraftPresenceRequest: Encodable {
         self.status = status.rawValue
         self.joinInfo = joinInfo
     }
-
-    private enum CodingKeys: String, CodingKey {
-        case status
-        case joinInfo
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(status, forKey: .status)
-        try c.encodeIfPresent(joinInfo, forKey: .joinInfo)
-    }
 }
 
 struct MinecraftJoinInfoUpdate: Encodable, Sendable {
     let value: String
     var invites: [String]?
-
-    private enum CodingKeys: String, CodingKey {
-        case value
-        case invites
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(value, forKey: .value)
-        try c.encodeIfPresent(invites, forKey: .invites)
-    }
 }
 
 struct MinecraftPresenceResponse: Codable, Equatable, Sendable {
@@ -144,11 +102,6 @@ struct MinecraftPresenceResponse: Codable, Equatable, Sendable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         presence = try c.decodeIfPresent([MinecraftPresenceStatusDTO].self, forKey: .presence) ?? []
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(presence, forKey: .presence)
     }
 }
 
@@ -173,12 +126,6 @@ struct MinecraftPresenceJoinInfoDTO: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         value = try c.decodeIfPresent(String.self, forKey: .value)
         invited = try c.decodeIfPresent(Bool.self, forKey: .invited) ?? false
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encodeIfPresent(value, forKey: .value)
-        try c.encode(invited, forKey: .invited)
     }
 }
 

@@ -38,33 +38,30 @@ struct MinecraftFriendsSheetView: View {
                             .controlSize(.small)
                             .frame(maxWidth: .infinity, minHeight: 120)
                     } else if isEmptyState {
-                        VStack(spacing: 16) {
-                            Text("minecraft.friends.empty".localized())
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 120)
+                        Text("minecraft.friends.empty".localized())
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 120, alignment: .leading)
                     } else {
                         ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 16) {
-                                if !viewModel.uiData.lists.friends.isEmpty {
-                                    sectionHeader("minecraft.friends.section.friends".localized())
-                                    ForEach(viewModel.uiData.lists.friends, id: \.profileId.normalized) { dto in
-                                        friendRow(dto: dto, rowActions: .confirmed)
-                                    }
-                                }
-                                if !viewModel.uiData.lists.incomingRequests.isEmpty {
-                                    sectionHeader("minecraft.friends.section.incoming".localized())
-                                    ForEach(viewModel.uiData.lists.incomingRequests, id: \.profileId.normalized) { dto in
-                                        friendRow(dto: dto, rowActions: .incoming)
-                                    }
-                                }
-                                if !viewModel.uiData.lists.outgoingRequests.isEmpty {
-                                    sectionHeader("minecraft.friends.section.outgoing".localized())
-                                    ForEach(viewModel.uiData.lists.outgoingRequests, id: \.profileId.normalized) { dto in
-                                        friendRow(dto: dto, rowActions: .outgoing)
-                                    }
-                                }
+                            VStack(alignment: .leading, spacing: 16) {
+                                friendsListSection(
+                                    sectionId: "friends",
+                                    title: "minecraft.friends.section.friends".localized(),
+                                    dtos: viewModel.uiData.lists.friends,
+                                    rowActions: .confirmed
+                                )
+                                friendsListSection(
+                                    sectionId: "incoming",
+                                    title: "minecraft.friends.section.incoming".localized(),
+                                    dtos: viewModel.uiData.lists.incomingRequests,
+                                    rowActions: .incoming
+                                )
+                                friendsListSection(
+                                    sectionId: "outgoing",
+                                    title: "minecraft.friends.section.outgoing".localized(),
+                                    dtos: viewModel.uiData.lists.outgoingRequests,
+                                    rowActions: .outgoing
+                                )
                             }
                         }
                     }
@@ -125,6 +122,17 @@ struct MinecraftFriendsSheetView: View {
         return l.friends.isEmpty && l.incomingRequests.isEmpty && l.outgoingRequests.isEmpty
     }
 
+    @ViewBuilder
+    private func friendsListSection(sectionId: String, title: String, dtos: [MinecraftFriendProfileDTO], rowActions: RowActions) -> some View {
+        if !dtos.isEmpty {
+            sectionHeader(title)
+            ForEach(dtos, id: \.profileId.normalized) { dto in
+                friendRow(dto: dto, rowActions: rowActions)
+                    .id("\(sectionId)-\(rowActions.rawValue)-\(dto.profileId.normalized)")
+            }
+        }
+    }
+
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
             .font(.subheadline.weight(.semibold))
@@ -132,7 +140,7 @@ struct MinecraftFriendsSheetView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private enum RowActions {
+    private enum RowActions: String {
         case confirmed
         case incoming
         case outgoing
@@ -161,12 +169,6 @@ struct MinecraftFriendsSheetView: View {
                         Spacer(minLength: 4)
                         presenceBadge(presence?.status)
                     }
-//                    if let j = presence?.joinInfo, let v = j.value, !v.isEmpty {
-//                        Text(v)
-//                            .font(.caption2)
-//                            .foregroundStyle(.tertiary)
-//                            .lineLimit(2)
-//                    }
                 }
                 actionButtons(for: dto, rowActions: rowActions)
             }

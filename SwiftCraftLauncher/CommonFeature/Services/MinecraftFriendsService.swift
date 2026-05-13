@@ -1,11 +1,10 @@
 import Foundation
 
-///
 final class MinecraftFriendsService: @unchecked Sendable {
     static let shared = MinecraftFriendsService()
 
     private let jsonDecoder: JSONDecoder
-    private let jsonEncoder: JSONEncoder
+    fileprivate let jsonEncoder: JSONEncoder
     private let coordinator = MinecraftFriendsCoordinator()
 
     init() {
@@ -28,14 +27,12 @@ final class MinecraftFriendsService: @unchecked Sendable {
     }
 
     func performFriendAction(accessToken: String, request: MinecraftFriendActionRequest) async throws -> MinecraftFriendsListResponse {
-        let url = URLConfig.API.Authentication.minecraftFriends
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "PUT"
-        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.accept)
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.contentType)
-        urlRequest.httpBody = try jsonEncoder.encode(request)
-
+        let urlRequest = Self.authenticatedJSONRequest(
+            url: URLConfig.API.Authentication.minecraftFriends,
+            method: "PUT",
+            accessToken: accessToken,
+            body: try jsonEncoder.encode(request)
+        )
         let (data, http) = try await APIClient.performRequestWithResponse(request: urlRequest)
         try Self.throwIfFailedResponse(http: http, data: data)
 
@@ -49,20 +46,18 @@ final class MinecraftFriendsService: @unchecked Sendable {
         enableFriendlist: Bool,
         enableFriendInvites: Bool
     ) async throws {
-        let url = URLConfig.API.Authentication.minecraftPlayerAttributes
         let body = MinecraftUserAttributesRequest(
             friendsPreferences: MinecraftFriendsPreferencesPayload(
                 friends: enableFriendlist ? .enabled : .disabled,
                 acceptInvites: enableFriendInvites ? .enabled : .disabled
             )
         )
-        var urlRequest = URLRequest(url: url)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.accept)
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.contentType)
-        urlRequest.httpBody = try jsonEncoder.encode(body)
-
+        let urlRequest = Self.authenticatedJSONRequest(
+            url: URLConfig.API.Authentication.minecraftPlayerAttributes,
+            method: "POST",
+            accessToken: accessToken,
+            body: try jsonEncoder.encode(body)
+        )
         let (data, http) = try await APIClient.performRequestWithResponse(request: urlRequest)
         try Self.throwIfFailedResponse(http: http, data: data)
     }
@@ -74,14 +69,12 @@ final class MinecraftFriendsService: @unchecked Sendable {
         status: Int,
         etag: String?
     ) {
-        var urlRequest = URLRequest(url: URLConfig.API.Authentication.minecraftFriends)
-        urlRequest.httpMethod = "GET"
-        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.accept)
-        if let etag = ifNoneMatch, !etag.isEmpty {
-            urlRequest.setValue(etag, forHTTPHeaderField: "If-None-Match")
-        }
-
+        let urlRequest = Self.authenticatedJSONRequest(
+            url: URLConfig.API.Authentication.minecraftFriends,
+            method: "GET",
+            accessToken: accessToken,
+            ifNoneMatch: ifNoneMatch
+        )
         let (data, http) = try await APIClient.performRequestWithResponse(request: urlRequest)
         let code = http.statusCode
         switch code {
@@ -105,16 +98,13 @@ final class MinecraftFriendsService: @unchecked Sendable {
         status: Int,
         etag: String?
     ) {
-        var urlRequest = URLRequest(url: URLConfig.API.Authentication.minecraftPresence)
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.accept)
-        urlRequest.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.contentType)
-        if let etag = ifNoneMatch, !etag.isEmpty {
-            urlRequest.setValue(etag, forHTTPHeaderField: "If-None-Match")
-        }
-        urlRequest.httpBody = body
-
+        let urlRequest = Self.authenticatedJSONRequest(
+            url: URLConfig.API.Authentication.minecraftPresence,
+            method: "POST",
+            accessToken: accessToken,
+            body: body,
+            ifNoneMatch: ifNoneMatch
+        )
         let (data, http) = try await APIClient.performRequestWithResponse(request: urlRequest)
         let code = http.statusCode
         switch code {
@@ -133,7 +123,26 @@ final class MinecraftFriendsService: @unchecked Sendable {
         }
     }
 
-    fileprivate var encoderForCoordinator: JSONEncoder { jsonEncoder }
+    private static func authenticatedJSONRequest(
+        url: URL,
+        method: String,
+        accessToken: String,
+        body: Data? = nil,
+        ifNoneMatch: String? = nil
+    ) -> URLRequest {
+        var r = URLRequest(url: url)
+        r.httpMethod = method
+        r.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        r.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.accept)
+        if let body {
+            r.setValue(APIClient.MimeType.json, forHTTPHeaderField: APIClient.Header.contentType)
+            r.httpBody = body
+        }
+        if let ifNoneMatch, !ifNoneMatch.isEmpty {
+            r.setValue(ifNoneMatch, forHTTPHeaderField: "If-None-Match")
+        }
+        return r
+    }
 
     private static func etag(from response: HTTPURLResponse) -> String? {
         if let v = response.value(forHTTPHeaderField: "ETag") { return v }
@@ -256,19 +265,15 @@ private actor MinecraftFriendsCoordinator {
             lastFriendsFetchAt = Date()
         }
 
-        let presenceBody = try service.encoderForCoordinator.encode(MinecraftPresenceRequest(status: .offline, joinInfo: nil))
+        let presenceBody = try service.jsonEncoder.encode(MinecraftPresenceRequest(status: .offline, joinInfo: nil))
         let pres = try await service.executePostPresence(accessToken: accessToken, ifNoneMatch: presenceETag, body: presenceBody)
 
         if pres.status == 200 {
-            if !pres.presence.presence.isEmpty {
-                var map: [String: MinecraftPresenceStatusDTO] = [:]
-                for row in pres.presence.presence {
-                    map[row.profileId.normalized] = row
-                }
-                lastPresenceById = map
-            } else {
-                lastPresenceById = [:]
+            var map: [String: MinecraftPresenceStatusDTO] = [:]
+            for row in pres.presence.presence {
+                map[row.profileId.normalized] = row
             }
+            lastPresenceById = map
             if let e = pres.etag, !e.isEmpty {
                 presenceETag = e
             }
