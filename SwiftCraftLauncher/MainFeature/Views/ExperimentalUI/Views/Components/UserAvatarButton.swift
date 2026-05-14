@@ -32,7 +32,6 @@ struct UserAvatarButton: View {
                     .foregroundColor(.secondary)
             }
         }
-        //.buttonStyle(.plain)
         .sheet(isPresented: $showingProfileSheet) {
             if let player = playerListViewModel.currentPlayer {
                 UserProfileSheetView(player: player, friendsViewModel: friendsViewModel)

@@ -5,24 +5,31 @@ struct UserProfileSheetView: View {
     @ObservedObject var friendsViewModel: MinecraftFriendsSheetViewModel
     @EnvironmentObject var playerListViewModel: PlayerListViewModel
     @Environment(\.colorScheme) private var colorScheme
-
     @Environment(\.dismiss) private var dismiss
-    @State private var showAddFriendPopover = false
     @FocusState private var addFriendFieldFocused: Bool
     @State private var showingAddPlayerSheet = false
     @State private var newPlayerName = ""
     @State private var isPlayerNameValid = false
-    @State private var showFriendsDetailsPage = false
+
+    private enum SheetPage {
+        case profile
+        case friends
+        case addFriend
+    }
+
+    @State private var currentPage: SheetPage = .profile
 
     var body: some View {
         CommonSheetView(
-            header: { profileHeader },
-            body: { bodyContent },
-            footer: { footerContent }
+            header: { sheetHeader },
+            body: { sheetBody },
+            footer: { sheetFooter }
         )
         .onAppear {
             if player.canUseMicrosoftMinecraftServices {
-                Task { await friendsViewModel.load(player: player, forceRefresh: false) }
+                Task {
+                    await friendsViewModel.load(player: player, forceRefresh: false)
+                }
             }
         }
         .onDisappear {
@@ -58,15 +65,53 @@ struct UserProfileSheetView: View {
                 playerListViewModel: playerListViewModel
             )
         }
-        .sheet(isPresented: $showFriendsDetailsPage) {
-            NavigationStack {
-                friendsDetailsPage
-            }
-            .frame(minWidth: 560, minHeight: 420)
-        }
     }
 
     // MARK: - Profile Header
+
+    @ViewBuilder
+    private var sheetHeader: some View {
+        switch currentPage {
+        case .profile:
+            profileHeader
+        case .friends:
+            friendsPageHeader
+        case .addFriend:
+            addFriendPageHeader
+        }
+    }
+
+    private var addFriendPageHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                currentPage = .profile
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.headline)
+            }
+            .buttonStyle(.plain)
+            Text("minecraft.friends.add.title".localized())
+                .font(.title3.weight(.semibold))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var friendsPageHeader: some View {
+        HStack(spacing: 12) {
+            Button {
+                currentPage = .profile
+            } label: {
+                Image(systemName: "chevron.left")
+                    .font(.headline)
+            }
+            .buttonStyle(.plain)
+            Text("minecraft.friends.sheet.title".localized())
+                .font(.title3.weight(.semibold))
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
     private var profileHeader: some View {
         HStack(spacing: 16) {
@@ -77,11 +122,9 @@ struct UserProfileSheetView: View {
             )
             .id(player.id)
             .id(player.avatarName)
-
             VStack(alignment: .leading, spacing: 4) {
                 Text(player.name)
                     .font(.title3.weight(.semibold))
-
                 if player.isOnlineAccount {
                     Text("player.type.online".localized())
                         .font(.caption)
@@ -92,7 +135,6 @@ struct UserProfileSheetView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
             Spacer()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -101,11 +143,22 @@ struct UserProfileSheetView: View {
     // MARK: - Body Content
 
     @ViewBuilder
+    private var sheetBody: some View {
+        switch currentPage {
+        case .profile:
+            bodyContent
+        case .friends:
+            friendsDetailsPage
+        case .addFriend:
+            addFriendPage
+        }
+    }
+
+    @ViewBuilder
     private var bodyContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 playerSwitchingSection
-
                 if player.canUseMicrosoftMinecraftServices {
                     Divider()
                     friendsSection
@@ -121,7 +174,6 @@ struct UserProfileSheetView: View {
             Text("player.switch".localized())
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-
             ForEach(playerListViewModel.players) { p in
                 HStack(spacing: 10) {
                     MinecraftSkinUtils(
@@ -131,18 +183,15 @@ struct UserProfileSheetView: View {
                     )
                     .id(p.id)
                     .id(p.avatarName)
-
                     Text(p.name)
                         .font(.body)
                         .lineLimit(1)
                         .foregroundColor(p.id == player.id ? .primary : .secondary)
-
                     if p.id == player.id {
                         Image(systemName: "checkmark")
                             .font(.caption.weight(.semibold))
                             .foregroundColor(.accentColor)
                     }
-
                     Spacer()
                 }
                 .padding(.horizontal, 8)
@@ -159,7 +208,6 @@ struct UserProfileSheetView: View {
                     }
                 }
             }
-
             Button {
                 newPlayerName = ""
                 isPlayerNameValid = false
@@ -185,27 +233,20 @@ struct UserProfileSheetView: View {
         VStack(alignment: .leading, spacing: 14) {
             Text("minecraft.friends.sheet.title".localized())
                 .font(.title3.weight(.semibold))
-
             allFriendsCard
-
             quickActionsCard
-                .popover(isPresented: $showAddFriendPopover, arrowEdge: .bottom) {
-                    addFriendPopoverContent
-                        .presentationCompactAdaptation(.popover)
-                }
         }
     }
 
     private var allFriendsCard: some View {
         Button {
-            showFriendsDetailsPage = true
+            currentPage = .friends
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "person.2.fill")
                     .font(.system(size: 28))
                     .foregroundStyle(primaryCardTextColor.opacity(0.9))
                     .frame(width: 44)
-
                 VStack(alignment: .leading, spacing: 2) {
                     Text("minecraft.friends.section.friends".localized())
                         .font(.title3.weight(.semibold))
@@ -214,11 +255,8 @@ struct UserProfileSheetView: View {
                         .font(.headline)
                         .foregroundStyle(secondaryCardTextColor)
                 }
-
                 Spacer()
-
                 friendAvatarStack
-
                 Image(systemName: "chevron.right")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(secondaryCardTextColor)
@@ -258,7 +296,7 @@ struct UserProfileSheetView: View {
     private var quickActionsCard: some View {
         VStack(spacing: 0) {
             Button {
-                showAddFriendPopover = true
+                currentPage = .addFriend
             } label: {
                 quickActionRow(
                     icon: "person.badge.plus",
@@ -267,13 +305,11 @@ struct UserProfileSheetView: View {
             }
             .buttonStyle(.plain)
             .disabled(friendsViewModel.isLoading)
-
             Divider()
                 .overlay(colorScheme == .light ? Color.black.opacity(0.12) : Color.white.opacity(0.14))
                 .padding(.horizontal, 20)
-
             Button {
-                showFriendsDetailsPage = true
+                currentPage = .friends
             } label: {
                 quickActionRow(
                     icon: "person.crop.circle.badge.questionmark",
@@ -293,7 +329,6 @@ struct UserProfileSheetView: View {
                 .font(.system(size: 24))
                 .foregroundStyle(primaryCardTextColor.opacity(0.82))
                 .frame(width: 36)
-
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.title3.weight(.semibold))
@@ -304,15 +339,15 @@ struct UserProfileSheetView: View {
                         .foregroundStyle(secondaryCardTextColor)
                 }
             }
-
             Spacer()
-
             Image(systemName: "chevron.right")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(secondaryCardTextColor)
         }
         .padding(.horizontal, 22)
         .padding(.vertical, 20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
     }
 
     private var friendAvatarStack: some View {
@@ -392,31 +427,70 @@ struct UserProfileSheetView: View {
             }
             .padding()
         }
-        .navigationTitle("minecraft.friends.sheet.title".localized())
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("common.close".localized()) {
-                    showFriendsDetailsPage = false
-                }
-            }
-        }
     }
 
     // MARK: - Footer
+
+    @ViewBuilder
+    private var sheetFooter: some View {
+        switch currentPage {
+        case .profile:
+            footerContent
+        case .friends:
+            friendsFooter
+        case .addFriend:
+            addFriendFooter
+        }
+    }
+
+    private var addFriendFooter: some View {
+        HStack {
+            Button("common.cancel".localized()) {
+                friendsViewModel.addFriendName = ""
+                currentPage = .profile
+            }
+            Spacer()
+            Button {
+                submitAddFriend()
+            } label: {
+                Text("minecraft.friends.add.button".localized())
+            }
+            .keyboardShortcut(.defaultAction)
+            .disabled(friendsViewModel.isLoading)
+        }
+    }
+
+    private var friendsFooter: some View {
+        HStack {
+            Button {
+                Task {
+                    await friendsViewModel.load(player: player, forceRefresh: true)
+                }
+            } label: {
+                Text("minecraft.friends.refresh".localized())
+            }
+            .disabled(friendsViewModel.isLoading)
+            Spacer()
+            Button("common.close".localized()) {
+                dismiss()
+            }
+            .keyboardShortcut(.cancelAction)
+        }
+    }
 
     private var footerContent: some View {
         HStack {
             if player.canUseMicrosoftMinecraftServices {
                 Button {
-                    Task { await friendsViewModel.load(player: player, forceRefresh: true) }
+                    Task {
+                        await friendsViewModel.load(player: player, forceRefresh: true)
+                    }
                 } label: {
                     Text("minecraft.friends.refresh".localized())
                 }
                 .disabled(friendsViewModel.isLoading)
             }
-
             Spacer()
-
             Button("common.close".localized()) {
                 dismiss()
             }
@@ -426,33 +500,51 @@ struct UserProfileSheetView: View {
 
     // MARK: - Add Friend Popover
 
-    @ViewBuilder
-    private var addFriendPopoverContent: some View {
-        HStack {
-            TextField("minecraft.friends.add.placeholder".localized(), text: $friendsViewModel.addFriendName)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 240)
-                .focused($addFriendFieldFocused)
-                .disabled(friendsViewModel.isLoading)
-                .onSubmit { submitAddFriendFromPopover() }
-            Button("minecraft.friends.add.button".localized()) {
-                submitAddFriendFromPopover()
+    private var addFriendPage: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(primaryCardTextColor.opacity(0.7))
+                    TextField("minecraft.friends.add.placeholder".localized(), text: $friendsViewModel.addFriendName)
+                        .textFieldStyle(.roundedBorder)
+                        .focused($addFriendFieldFocused)
+                        .disabled(friendsViewModel.isLoading)
+                        .onSubmit {
+                            submitAddFriend()
+                        }
+                }
+                .padding(.horizontal)
+                Spacer(minLength: 20)
+                VStack(spacing: 8) {
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 42))
+                        .foregroundStyle(.secondary)
+                        .padding(.bottom, 6)
+                    Text("与朋友一起玩，游戏更有趣")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Text("minecraft.friends.add.empty_hint".localized())
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                }
+                Spacer()
             }
-            .keyboardShortcut(.defaultAction)
-            .disabled(friendsViewModel.isLoading)
-        }
-        .padding()
-        .onAppear {
-            addFriendFieldFocused = true
+            .padding()
+            .onAppear {
+                addFriendFieldFocused = true
+            }
         }
     }
 
-    private func submitAddFriendFromPopover() {
+    private func submitAddFriend() {
         let trimmed = friendsViewModel.addFriendName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         Task { @MainActor in
             await friendsViewModel.sendFriendRequest(player: player)
-            showAddFriendPopover = false
+            currentPage = .friends
         }
     }
 
@@ -491,7 +583,6 @@ struct UserProfileSheetView: View {
         let pid = dto.profileId.normalized
         let presence = friendsViewModel.uiData.presenceByProfileId[pid]
         let skinSrc = friendsViewModel.skinTextureURLString(forUUIDNormalized: pid)
-
         return VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .center, spacing: 10) {
                 if let skinSrc, !skinSrc.isEmpty {
@@ -522,26 +613,34 @@ struct UserProfileSheetView: View {
         switch rowActions {
         case .confirmed:
             Button("minecraft.friends.action.remove".localized()) {
-                Task { await friendsViewModel.removeFriend(player: player, profileId: wireId) }
+                Task {
+                    await friendsViewModel.removeFriend(player: player, profileId: wireId)
+                }
             }
             .disabled(friendsViewModel.isLoading)
             .controlSize(.small)
         case .incoming:
             HStack(spacing: 4) {
                 Button("minecraft.friends.action.accept".localized()) {
-                    Task { await friendsViewModel.acceptIncoming(player: player, profileId: wireId) }
+                    Task {
+                        await friendsViewModel.acceptIncoming(player: player, profileId: wireId)
+                    }
                 }
                 .disabled(friendsViewModel.isLoading)
                 .controlSize(.small)
                 Button("minecraft.friends.action.decline".localized()) {
-                    Task { await friendsViewModel.declineIncoming(player: player, profileId: wireId) }
+                    Task {
+                        await friendsViewModel.declineIncoming(player: player, profileId: wireId)
+                    }
                 }
                 .disabled(friendsViewModel.isLoading)
                 .controlSize(.small)
             }
         case .outgoing:
             Button("minecraft.friends.action.revoke".localized()) {
-                Task { await friendsViewModel.revokeOutgoing(player: player, profileId: wireId) }
+                Task {
+                    await friendsViewModel.revokeOutgoing(player: player, profileId: wireId)
+                }
             }
             .disabled(friendsViewModel.isLoading)
             .controlSize(.small)

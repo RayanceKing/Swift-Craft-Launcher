@@ -42,9 +42,7 @@ struct ExploreView: View {
                         ModpackHeroCarousel(items: heroItems, currentIndex: $currentIndex)
                             .frame(height: geometry.size.height * 0.68)
                     }
-
                     classificationBar
-
                     sectionCards
                 }
             }
@@ -94,14 +92,12 @@ struct ExploreView: View {
                     items: topModpacks
                 )
             }
-
             if !popularMods.isEmpty {
                 sectionView(
                     title: "explore.popular_mods".localized(),
                     items: popularMods
                 )
             }
-
             Spacer().frame(height: 32)
         }
         .padding(.horizontal, 20)
@@ -113,7 +109,6 @@ struct ExploreView: View {
             Text(title)
                 .font(.title3.bold())
                 .padding(.leading, 4)
-
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(items) { item in
@@ -157,7 +152,6 @@ struct ExploreView: View {
                     topTrailingRadius: 14
                 )
             )
-
             // Info area
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
@@ -198,9 +192,15 @@ struct ExploreView: View {
 
     private func loadAllData() async {
         await withTaskGroup(of: Void.self) { group in
-            group.addTask { await loadHeroItems() }
-            group.addTask { await loadTopModpacks() }
-            group.addTask { await loadPopularMods() }
+            group.addTask {
+                await loadHeroItems()
+            }
+            group.addTask {
+                await loadTopModpacks()
+            }
+            group.addTask {
+                await loadPopularMods()
+            }
         }
     }
 
@@ -213,7 +213,6 @@ struct ExploreView: View {
             (.modpack, "modpack"),
             (.minecraftJavaServer, "minecraft_java_server"),
         ]
-
         var items: [ModpackHeroItem] = []
         for (resourceType, projectType) in types {
             let result = await ModrinthService.searchProjects(
@@ -236,8 +235,9 @@ struct ExploreView: View {
                 ))
             }
         }
-
-        await MainActor.run { heroItems = items }
+        await MainActor.run {
+            heroItems = items
+        }
     }
 
     private func loadTopModpacks() async {
@@ -249,7 +249,6 @@ struct ExploreView: View {
         )
         let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
         let top10 = Array(sorted.prefix(10))
-
         let items = top10.map { project in
             let hue = Double(abs(project.slug.hashValue) % 360) / 360.0
             return ModpackHeroItem(
@@ -262,8 +261,9 @@ struct ExploreView: View {
                 fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
             )
         }
-
-        await MainActor.run { topModpacks = items }
+        await MainActor.run {
+            topModpacks = items
+        }
     }
 
     private func loadPopularMods() async {
@@ -275,7 +275,6 @@ struct ExploreView: View {
         )
         let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
         let top10 = Array(sorted.prefix(10))
-
         let items = top10.map { project in
             let hue = Double(abs(project.slug.hashValue) % 360) / 360.0
             return ModpackHeroItem(
@@ -288,8 +287,9 @@ struct ExploreView: View {
                 fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
             )
         }
-
-        await MainActor.run { popularMods = items }
+        await MainActor.run {
+            popularMods = items
+        }
     }
 
     private func downloadCountString(_ count: Int) -> String {
@@ -324,9 +324,7 @@ struct ExploreFilterView: View {
                     }
                 }
                 .buttonStyle(.plain)
-
                 Spacer()
-
                 HStack(spacing: 6) {
                     Image(systemName: resourceType.systemImage)
                     Text(resourceType.localizedName)
@@ -336,9 +334,7 @@ struct ExploreFilterView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
             .background(.bar)
-
             Divider()
-
             // Filter content
             CategoryContentView(
                 project: resourceType.rawValue,

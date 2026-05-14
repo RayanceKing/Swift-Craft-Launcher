@@ -3,7 +3,6 @@ import SwiftUI
 struct ExploreDetailView: View {
     let item: ModpackHeroItem
     let onDismiss: () -> Void
-
     @State private var projectDetail: ModrinthProjectDetail?
     @State private var versions: [ModrinthProjectDetailVersion] = []
     @State private var isLoading = true
@@ -17,13 +16,14 @@ struct ExploreDetailView: View {
                 VStack(spacing: 0) {
                     // Hero header
                     heroHeader(width: geometry.size.width, height: geometry.size.height * 0.48)
-
                     // Content sections
                     detailSections
                 }
             }
         }
-        .task { await loadDetail() }
+        .task {
+            await loadDetail()
+        }
         .sheet(isPresented: $showInstallSheet) {
             versionSelectionSheet
         }
@@ -42,9 +42,7 @@ struct ExploreDetailView: View {
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
-
             Divider()
-
             if versions.isEmpty {
                 Spacer()
                 ProgressView().controlSize(.small)
@@ -92,14 +90,12 @@ struct ExploreDetailView: View {
         ZStack(alignment: .bottomLeading) {
             // Blurred background from icon
             blurredHeaderBackground(width: width, height: height)
-
             // Dark gradient for readability
             LinearGradient(
                 colors: [.clear, .black.opacity(0.4)],
                 startPoint: .top,
                 endPoint: .bottom
             )
-
             // Content
             VStack(alignment: .leading, spacing: 16) {
                 // Back + title bar at top
@@ -119,14 +115,11 @@ struct ExploreDetailView: View {
                         .clipShape(Capsule())
                     }
                     .buttonStyle(.plain)
-
                     Spacer()
                 }
                 .padding(.top, 16)
                 .padding(.horizontal, 20)
-
                 Spacer()
-
                 // Bottom info
                 VStack(alignment: .leading, spacing: 12) {
                     // App icon
@@ -146,16 +139,13 @@ struct ExploreDetailView: View {
                             }
                         }
                     }
-
                     Text(item.title)
                         .font(.largeTitle.bold())
                         .foregroundColor(.white)
                         .lineLimit(2)
-
                     Text(item.author)
                         .font(.title3)
                         .foregroundColor(.white.opacity(0.8))
-
                     HStack(spacing: 16) {
                         Label(downloadCountStr(item.downloads), systemImage: "arrow.down.to.line")
                         if let detail = projectDetail {
@@ -164,7 +154,6 @@ struct ExploreDetailView: View {
                     }
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.7))
-
                     // Install button
                     Button {
                         handleInstall()
@@ -232,12 +221,10 @@ struct ExploreDetailView: View {
                             .font(.title3.bold())
                         Spacer()
                     }
-
                     Text(detail.description)
                         .font(.body)
                         .foregroundColor(.secondary)
                         .lineLimit(5)
-
                     if !detail.categories.isEmpty {
                         FlowLayout(spacing: 6) {
                             ForEach(detail.categories, id: \.self) { cat in
@@ -256,13 +243,11 @@ struct ExploreDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
-
                 // Info
                 VStack(alignment: .leading, spacing: 14) {
                     Text("resource.detail.info".localized())
                         .font(.title3.bold())
                         .padding(.leading, 4)
-
                     infoRow(label: "resource.detail.license".localized(), value: detail.license?.name ?? "-")
                     infoRow(label: "resource.detail.client_side".localized(), value: detail.clientSide)
                     infoRow(label: "resource.detail.server_side".localized(), value: detail.serverSide)
@@ -277,7 +262,6 @@ struct ExploreDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16))
                 .padding(.horizontal, 20)
                 .padding(.top, 16)
-
                 // Links
                 VStack(alignment: .leading, spacing: 12) {
                     if let wikiUrl = detail.wikiUrl, let url = URL(string: wikiUrl) {

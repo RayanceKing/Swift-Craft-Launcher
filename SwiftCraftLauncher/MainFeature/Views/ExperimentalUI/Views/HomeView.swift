@@ -56,7 +56,6 @@ struct HomeView: View {
                 Spacer()
             }
             .padding(.top, 24)
-
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(modpackItems) { item in
@@ -87,7 +86,6 @@ struct HomeView: View {
             }
             .frame(width: 140, height: 140)
             .clipShape(RoundedRectangle(cornerRadius: 14))
-
             Text(item.title)
                 .font(.caption.weight(.medium))
                 .lineLimit(1)
@@ -163,7 +161,6 @@ struct HomeView: View {
         )
         let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
         let top10 = Array(sorted.prefix(10))
-
         let items: [ModpackHeroItem] = top10.map { project in
             let hue = Double(abs(project.slug.hashValue) % 360) / 360.0
             return ModpackHeroItem(
@@ -176,7 +173,6 @@ struct HomeView: View {
                 fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
             )
         }
-
         await MainActor.run {
             modpackItems = items
             isLoading = false
