@@ -2,75 +2,42 @@ import SwiftUI
 
 struct UserAvatarButton: View {
     @EnvironmentObject var playerListViewModel: PlayerListViewModel
-    @State private var showingPopover = false
-    @State private var playerToDelete: Player?
-    @State private var showDeleteAlert = false
+    @State private var showingProfileSheet = false
     @State private var showingAddPlayerSheet = false
     @State private var playerName = ""
     @State private var isPlayerNameValid = false
+    @StateObject private var friendsViewModel = MinecraftFriendsSheetViewModel()
 
     var body: some View {
         Button {
-            showingPopover.toggle()
+            if playerListViewModel.currentPlayer != nil {
+                showingProfileSheet = true
+            } else {
+                playerName = ""
+                isPlayerNameValid = false
+                showingAddPlayerSheet = true
+            }
         } label: {
             if let player = playerListViewModel.currentPlayer {
-                HStack(spacing: 8) {
-                    MinecraftSkinUtils(
-                        type: player.isOnlineAccount ? .url : .asset,
-                        src: player.avatarName,
-                        size: 28
-                    )
-                    .id(player.id)
-                    .id(player.avatarName)
-                    Text(player.name)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-                }
+                MinecraftSkinUtils(
+                    type: player.isOnlineAccount ? .url : .asset,
+                    src: player.avatarName,
+                    size: 28
+                )
+                .id(player.id)
+                .id(player.avatarName)
             } else {
-                HStack(spacing: 6) {
-                    Image(systemName: "person.crop.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundColor(.secondary)
-                    Text("experimental.no_player".localized())
-                        .font(.system(size: 13))
-                        .foregroundColor(.secondary)
-                }
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 15))
+                    .foregroundColor(.secondary)
             }
         }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showingPopover, arrowEdge: .top) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(playerListViewModel.players) { player in
-                    PlayerPopoverRow(
-                        player: player,
-                        onSelect: {
-                            playerListViewModel.setCurrentPlayer(byID: player.id)
-                            showingPopover = false
-                        },
-                        onDelete: {
-                            playerToDelete = player
-                            showDeleteAlert = true
-                        }
-                    )
-                }
-                Divider()
-                Button {
-                    showingPopover = false
-                    playerName = ""
-                    isPlayerNameValid = false
-                    showingAddPlayerSheet = true
-                } label: {
-                    HStack {
-                        Image(systemName: "plus.circle.fill")
-                        Text("player.add".localized())
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
+        //.buttonStyle(.plain)
+        .sheet(isPresented: $showingProfileSheet) {
+            if let player = playerListViewModel.currentPlayer {
+                UserProfileSheetView(player: player, friendsViewModel: friendsViewModel)
+                    .environmentObject(playerListViewModel)
             }
-            .padding(.vertical, 4)
         }
         .sheet(isPresented: $showingAddPlayerSheet) {
             AddPlayerSheetView(
@@ -102,57 +69,5 @@ struct UserAvatarButton: View {
                 playerListViewModel: playerListViewModel
             )
         }
-        .confirmationDialog(
-            "player.remove".localized(),
-            isPresented: $showDeleteAlert,
-            titleVisibility: .visible
-        ) {
-            Button("player.remove".localized(), role: .destructive) {
-                if let player = playerToDelete {
-                    _ = playerListViewModel.deletePlayer(byID: player.id)
-                }
-                playerToDelete = nil
-            }
-            Button("common.cancel".localized(), role: .cancel) {
-                playerToDelete = nil
-            }
-        } message: {
-            Text(String(format: "player.remove.confirm".localized(), playerToDelete?.name ?? ""))
-        }
-    }
-}
-
-private struct PlayerPopoverRow: View {
-    let player: Player
-    let onSelect: () -> Void
-    let onDelete: () -> Void
-
-    var body: some View {
-        HStack {
-            Button {
-                onSelect()
-            } label: {
-                MinecraftSkinUtils(
-                    type: player.isOnlineAccount ? .url : .asset,
-                    src: player.avatarName,
-                    size: 32
-                )
-                .id(player.id)
-                .id(player.avatarName)
-                Text(player.name)
-                    .foregroundColor(.primary)
-            }
-            .buttonStyle(.plain)
-            Spacer(minLength: 64)
-            Button {
-                onDelete()
-            } label: {
-                Image(systemName: "trash.fill")
-                    .help("player.remove".localized())
-            }
-            .buttonStyle(.borderless)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
     }
 }

@@ -153,4 +153,4 @@ DerivedData/
 *.crt
 *.cer
 ed25519_priv.pem
-
+Secrets.xcconfig
