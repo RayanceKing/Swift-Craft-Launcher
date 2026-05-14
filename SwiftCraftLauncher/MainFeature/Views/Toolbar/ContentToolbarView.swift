@@ -39,11 +39,6 @@ public struct ContentToolbarView: ToolbarContent {
         currentPlayer?.isOnlineAccount ?? false
     }
 
-    private var canUseMinecraftServicesFriends: Bool {
-        guard let p = currentPlayer, p.isOnlineAccount else { return false }
-        return OfflineUserServerMap.serverKey(for: p.id) == nil
-    }
-
     public var body: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
@@ -154,7 +149,7 @@ public struct ContentToolbarView: ToolbarContent {
                     }
                 }
 
-                if canUseMinecraftServicesFriends {
+                if currentPlayer?.canUseMicrosoftMinecraftServices == true {
                     Button {
                         Task {
                             guard let p = currentPlayer else { return }

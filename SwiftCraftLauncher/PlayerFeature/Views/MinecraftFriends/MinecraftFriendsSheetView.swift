@@ -86,6 +86,9 @@ struct MinecraftFriendsSheetView: View {
                 }
             }
         )
+        .onDisappear {
+            viewModel.clearLoadedData()
+        }
     }
 
     @ViewBuilder private var addFriendPopoverContent: some View {

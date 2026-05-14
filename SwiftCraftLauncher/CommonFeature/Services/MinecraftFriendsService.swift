@@ -62,6 +62,25 @@ final class MinecraftFriendsService: @unchecked Sendable {
         try Self.throwIfFailedResponse(http: http, data: data)
     }
 
+    func fetchFriendAccountPreferences(accessToken: String) async throws -> MinecraftFriendsPreferencesPayload {
+        let urlRequest = Self.authenticatedJSONRequest(
+            url: URLConfig.API.Authentication.minecraftPlayerAttributes,
+            method: "GET",
+            accessToken: accessToken,
+            body: nil
+        )
+        let (data, http) = try await APIClient.performRequestWithResponse(request: urlRequest)
+        try Self.throwIfFailedResponse(http: http, data: data)
+        guard let parsed = Self.extractFriendsPreferencesPayload(from: data) else {
+            throw GlobalError.validation(
+                chineseMessage: "无法解析账号好友偏好设置",
+                i18nKey: "minecraft.friends.settings.parse_failed",
+                level: .notification
+            )
+        }
+        return parsed
+    }
+
     // MARK: - Package-private HTTP（由 Coordinator 调用）
 
     fileprivate func executeGetFriends(accessToken: String, ifNoneMatch: String?) async throws -> (
@@ -193,6 +212,47 @@ final class MinecraftFriendsService: @unchecked Sendable {
                 level: .notification
             )
         }
+    }
+
+    private struct MinecraftPlayerAttributesGETEnvelope: Decodable {
+        var friendsPreferences: MinecraftFriendsPreferencesPayload?
+        var preferences: PreferencesNode?
+
+        struct PreferencesNode: Decodable {
+            var friendsPreferences: MinecraftFriendsPreferencesPayload?
+        }
+    }
+
+    private static func extractFriendsPreferencesPayload(from data: Data) -> MinecraftFriendsPreferencesPayload? {
+        if let env = try? JSONDecoder().decode(MinecraftPlayerAttributesGETEnvelope.self, from: data) {
+            if let fp = env.friendsPreferences { return fp }
+            if let fp = env.preferences?.friendsPreferences { return fp }
+        }
+        return extractFriendsPreferencesPayloadLegacy(from: data)
+    }
+
+    private static func extractFriendsPreferencesPayloadLegacy(from data: Data) -> MinecraftFriendsPreferencesPayload? {
+        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        if let p = parseFriendsPreferencesFromAttributesDict(root) { return p }
+        if let pref = root["preferences"] as? [String: Any], let p = parseFriendsPreferencesFromAttributesDict(pref) { return p }
+        if let pref = root["Preferences"] as? [String: Any], let p = parseFriendsPreferencesFromAttributesDict(pref) { return p }
+        return nil
+    }
+
+    private static func parseFriendsPreferencesFromAttributesDict(_ dict: [String: Any]) -> MinecraftFriendsPreferencesPayload? {
+        if let fp = dict["friendsPreferences"] as? [String: Any] ?? dict["friends_preferences"] as? [String: Any] {
+            return decodeFriendsPreferencesObject(fp)
+        }
+        return nil
+    }
+
+    private static func decodeFriendsPreferencesObject(_ fp: [String: Any]) -> MinecraftFriendsPreferencesPayload? {
+        let friendsRaw = (fp["friends"] as? String) ?? (fp["Friends"] as? String)
+        let invitesRaw = (fp["acceptInvites"] as? String) ?? (fp["AcceptInvites"] as? String)
+        guard let f = friendsRaw, let i = invitesRaw else { return nil }
+        let friends = MinecraftToggleWireValue(rawValue: f.uppercased()) ?? .disabled
+        let invites = MinecraftToggleWireValue(rawValue: i.uppercased()) ?? .disabled
+        return MinecraftFriendsPreferencesPayload(friends: friends, acceptInvites: invites)
     }
 
     private static func parseFriendsErrorDetail(from data: Data) -> (chineseMessage: String, i18nKey: String)? {

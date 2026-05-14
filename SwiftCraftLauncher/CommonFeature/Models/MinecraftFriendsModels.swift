@@ -61,14 +61,25 @@ struct MinecraftUserAttributesRequest: Encodable {
     let friendsPreferences: MinecraftFriendsPreferencesPayload
 }
 
-struct MinecraftFriendsPreferencesPayload: Encodable {
+struct MinecraftFriendsPreferencesPayload: Codable, Equatable, Sendable {
     let friends: MinecraftToggleWireValue
     let acceptInvites: MinecraftToggleWireValue
 }
 
-enum MinecraftToggleWireValue: String, Encodable, Sendable {
+enum MinecraftToggleWireValue: String, Codable, Sendable {
     case enabled = "ENABLED"
     case disabled = "DISABLED"
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.singleValueContainer()
+        let raw = (try c.decode(String.self)).uppercased()
+        self = Self(rawValue: raw) ?? .disabled
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode(rawValue)
+    }
 }
 
 // MARK: - Presence

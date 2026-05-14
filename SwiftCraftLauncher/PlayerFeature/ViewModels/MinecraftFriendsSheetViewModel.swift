@@ -8,6 +8,8 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published var addFriendName: String = ""
 
+    private var contentEpoch: UInt64 = 0
+
     private let friendsService: MinecraftFriendsService
     private let authService: MinecraftAuthService
     private let dataManager: PlayerDataManager
@@ -25,13 +27,23 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
         self.errorHandler = errorHandler
     }
 
+    func clearLoadedData() {
+        contentEpoch &+= 1
+        uiData = .empty
+        skinTextureURLByUUID = [:]
+        addFriendName = ""
+        isLoading = false
+    }
+
     func load(player: Player, forceRefresh: Bool) async {
+        let epoch = contentEpoch
         isLoading = true
         defer { isLoading = false }
 
         guard let tokenPlayer = await preparedTokenPlayer(
             for: player,
             onMissingCredential: {
+                guard epoch == contentEpoch else { return }
                 uiData = .empty
                 skinTextureURLByUUID = [:]
                 reportMissingAccessToken()
@@ -39,11 +51,13 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
         ) else { return }
 
         do {
-            uiData = try await friendsService.fetchFriendsAndPresence(
+            let fetched = try await friendsService.fetchFriendsAndPresence(
                 accessToken: tokenPlayer.authAccessToken,
                 forceRefresh: forceRefresh
             )
-            await prefetchSkinTextureURLs(for: uiData)
+            guard epoch == contentEpoch else { return }
+            uiData = fetched
+            await prefetchSkinTextureURLs(for: uiData, epoch: epoch)
         } catch {
             errorHandler.handle(GlobalError.from(error))
         }
@@ -98,6 +112,7 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
     }
 
     private func mutate(player: Player, action: (String) async throws -> Void) async {
+        let epoch = contentEpoch
         guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: reportMissingAccessToken) else { return }
 
         isLoading = true
@@ -105,11 +120,14 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
 
         do {
             try await action(tokenPlayer.authAccessToken)
-            uiData = try await friendsService.fetchFriendsAndPresence(
+            guard epoch == contentEpoch else { return }
+            let fetched = try await friendsService.fetchFriendsAndPresence(
                 accessToken: tokenPlayer.authAccessToken,
                 forceRefresh: true
             )
-            await prefetchSkinTextureURLs(for: uiData)
+            guard epoch == contentEpoch else { return }
+            uiData = fetched
+            await prefetchSkinTextureURLs(for: uiData, epoch: epoch)
         } catch {
             errorHandler.handle(GlobalError.from(error))
         }
@@ -147,9 +165,10 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
         )
     }
 
-    private func prefetchSkinTextureURLs(for data: MinecraftFriendsUIData) async {
+    private func prefetchSkinTextureURLs(for data: MinecraftFriendsUIData, epoch: UInt64) async {
         let ids = collectNormalizedUUIDs(from: data)
         guard !ids.isEmpty else {
+            guard epoch == contentEpoch else { return }
             skinTextureURLByUUID = [:]
             return
         }
@@ -158,6 +177,7 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
         var built: [String: String] = [:]
         var start = 0
         while start < ids.count {
+            guard epoch == contentEpoch else { return }
             let end = min(start + batchSize, ids.count)
             let batch = Array(ids[start..<end])
             await withTaskGroup(of: (String, String?).self) { group in
@@ -175,6 +195,7 @@ final class MinecraftFriendsSheetViewModel: ObservableObject {
             }
             start = end
         }
+        guard epoch == contentEpoch else { return }
         skinTextureURLByUUID = built
     }
 
