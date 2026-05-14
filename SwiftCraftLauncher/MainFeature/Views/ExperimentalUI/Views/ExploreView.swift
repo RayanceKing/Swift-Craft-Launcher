@@ -8,12 +8,20 @@ struct ExploreView: View {
     @State private var popularMods: [ModpackHeroItem] = []
     @State private var selectedTypeForFilter: ResourceType?
     @State private var selectedDetailItem: ModpackHeroItem?
+    @State private var isLoading: Bool = true
 
     private let resourceTypes = ResourceType.allCases
 
     var body: some View {
         Group {
-            if let detailItem = selectedDetailItem {
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView().controlSize(.large)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let detailItem = selectedDetailItem {
                 ExploreDetailView(
                     item: detailItem,
                     onDismiss: { selectedDetailItem = nil }
@@ -30,6 +38,11 @@ struct ExploreView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: selectedTypeForFilter != nil)
         .animation(.easeInOut(duration: 0.3), value: selectedDetailItem != nil)
+        .task {
+            if isLoading {
+                await loadAllData()
+            }
+        }
     }
 
     // MARK: - Main Content
@@ -46,9 +59,6 @@ struct ExploreView: View {
                     sectionCards
                 }
             }
-        }
-        .task {
-            await loadAllData()
         }
     }
 
@@ -201,6 +211,9 @@ struct ExploreView: View {
             group.addTask {
                 await loadPopularMods()
             }
+        }
+        await MainActor.run {
+            isLoading = false
         }
     }
 

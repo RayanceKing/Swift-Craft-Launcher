@@ -11,21 +11,30 @@ struct ExploreDetailView: View {
     @State private var selectedVersion: ModrinthProjectDetailVersion?
 
     var body: some View {
-        GeometryReader { geometry in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // Hero header
-                    heroHeader(width: geometry.size.width, height: geometry.size.height * 0.48)
-                    // Content sections
-                    detailSections
+        NavigationStack {
+            GeometryReader { geometry in
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        // Hero header
+                        heroHeader(width: geometry.size.width, height: geometry.size.height * 0.48)
+                        // Content sections
+                        detailSections
+                    }
                 }
             }
-        }
-        .task {
-            await loadDetail()
-        }
-        .sheet(isPresented: $showInstallSheet) {
-            versionSelectionSheet
+            .task {
+                await loadDetail()
+            }
+            .sheet(isPresented: $showInstallSheet) {
+                versionSelectionSheet
+            }
+            .toolbar {
+                ToolbarItem(placement: .navigation) {
+                    Button(action: { onDismiss() }) {
+                        Label("common.back".localized(), systemImage: "chevron.left")
+                    }
+                }
+            }
         }
     }
 
@@ -98,27 +107,6 @@ struct ExploreDetailView: View {
             )
             // Content
             VStack(alignment: .leading, spacing: 16) {
-                // Back + title bar at top
-                HStack {
-                    Button {
-                        onDismiss()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 16, weight: .semibold))
-                            Text("common.back".localized())
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(.ultraThinMaterial)
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    Spacer()
-                }
-                .padding(.top, 16)
-                .padding(.horizontal, 20)
                 Spacer()
                 // Bottom info
                 VStack(alignment: .leading, spacing: 12) {

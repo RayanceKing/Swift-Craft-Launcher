@@ -62,6 +62,9 @@ struct ExperimentalMainView: View {
                 }
             }
             .toolbarBackground(.hidden, for: .windowToolbar)
+            .onAppear {
+                playerListViewModel.loadPlayers()
+            }
     }
 
     @ViewBuilder private var contentForTab: some View {

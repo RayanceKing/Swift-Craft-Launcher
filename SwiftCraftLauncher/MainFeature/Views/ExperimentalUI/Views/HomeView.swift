@@ -32,10 +32,14 @@ struct HomeView: View {
     private func loadingView(height: CGFloat) -> some View {
         VStack {
             Spacer()
-            ProgressView().controlSize(.large)
+            HStack {
+                Spacer()
+                ProgressView().controlSize(.large)
+                Spacer()
+            }
             Spacer()
         }
-        .frame(height: height)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - Hero
