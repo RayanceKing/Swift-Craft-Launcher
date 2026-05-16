@@ -2,19 +2,16 @@ import SwiftUI
 
 struct ExploreView: View {
     @EnvironmentObject var filterState: ResourceFilterState
-    @State private var heroItems: [ModpackHeroItem] = []
+    @EnvironmentObject var contentStore: ExperimentalContentStore
     @State private var currentIndex: Int = 0
-    @State private var topModpacks: [ModpackHeroItem] = []
-    @State private var popularMods: [ModpackHeroItem] = []
     @State private var selectedTypeForFilter: ResourceType?
     @State private var selectedDetailItem: ModpackHeroItem?
-    @State private var isLoading: Bool = true
 
     private let resourceTypes = ResourceType.allCases
 
     var body: some View {
         Group {
-            if isLoading {
+            if contentStore.isExploreLoading {
                 VStack {
                     Spacer()
                     ProgressView().controlSize(.large)
@@ -39,20 +36,17 @@ struct ExploreView: View {
         .animation(.easeInOut(duration: 0.3), value: selectedTypeForFilter != nil)
         .animation(.easeInOut(duration: 0.3), value: selectedDetailItem != nil)
         .task {
-            if isLoading {
-                await loadAllData()
-            }
+            await contentStore.loadExploreIfNeeded()
         }
     }
 
     // MARK: - Main Content
-
     private var mainContent: some View {
         GeometryReader { geometry in
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
-                    if !heroItems.isEmpty {
-                        ModpackHeroCarousel(items: heroItems, currentIndex: $currentIndex)
+                    if !contentStore.heroItems.isEmpty {
+                        ModpackHeroCarousel(items: contentStore.heroItems, currentIndex: $currentIndex)
                             .frame(height: geometry.size.height * 0.68)
                     }
                     classificationBar
@@ -63,7 +57,6 @@ struct ExploreView: View {
     }
 
     // MARK: - Classification Bar
-
     private var classificationBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
@@ -93,19 +86,18 @@ struct ExploreView: View {
     }
 
     // MARK: - Section Cards
-
     private var sectionCards: some View {
         VStack(alignment: .leading, spacing: 24) {
-            if !topModpacks.isEmpty {
+            if !contentStore.topModpacks.isEmpty {
                 sectionView(
                     title: "explore.top_modpacks".localized(),
-                    items: topModpacks
+                    items: contentStore.topModpacks
                 )
             }
-            if !popularMods.isEmpty {
+            if !contentStore.popularMods.isEmpty {
                 sectionView(
                     title: "explore.popular_mods".localized(),
-                    items: popularMods
+                    items: contentStore.popularMods
                 )
             }
             Spacer().frame(height: 32)
@@ -119,6 +111,7 @@ struct ExploreView: View {
             Text(title)
                 .font(.title3.bold())
                 .padding(.leading, 4)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 14) {
                     ForEach(items) { item in
@@ -162,6 +155,7 @@ struct ExploreView: View {
                     topTrailingRadius: 14
                 )
             )
+
             // Info area
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.title)
@@ -198,113 +192,6 @@ struct ExploreView: View {
         }
     }
 
-    // MARK: - Data Loading
-
-    private func loadAllData() async {
-        await withTaskGroup(of: Void.self) { group in
-            group.addTask {
-                await loadHeroItems()
-            }
-            group.addTask {
-                await loadTopModpacks()
-            }
-            group.addTask {
-                await loadPopularMods()
-            }
-        }
-        await MainActor.run {
-            isLoading = false
-        }
-    }
-
-    private func loadHeroItems() async {
-        let types: [(ResourceType, String)] = [
-            (.mod, "mod"),
-            (.resourcepack, "resourcepack"),
-            (.datapack, "datapack"),
-            (.shader, "shader"),
-            (.modpack, "modpack"),
-            (.minecraftJavaServer, "minecraft_java_server"),
-        ]
-        var items: [ModpackHeroItem] = []
-        for (resourceType, projectType) in types {
-            let result = await ModrinthService.searchProjects(
-                facets: [["project_type:\(projectType)"]],
-                offset: 0,
-                limit: 5,
-                query: nil
-            )
-            let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
-            if let top = sorted.first {
-                let hue = Double(abs(top.slug.hashValue) % 360) / 360.0
-                items.append(ModpackHeroItem(
-                    id: top.projectId,
-                    title: top.title,
-                    author: top.author,
-                    description: resourceType.localizedName + " · " + top.description,
-                    downloads: top.downloads,
-                    iconUrl: top.iconUrl,
-                    fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
-                ))
-            }
-        }
-        await MainActor.run {
-            heroItems = items
-        }
-    }
-
-    private func loadTopModpacks() async {
-        let result = await ModrinthService.searchProjects(
-            facets: [["project_type:modpack"]],
-            offset: 0,
-            limit: 15,
-            query: nil
-        )
-        let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
-        let top10 = Array(sorted.prefix(10))
-        let items = top10.map { project in
-            let hue = Double(abs(project.slug.hashValue) % 360) / 360.0
-            return ModpackHeroItem(
-                id: project.projectId,
-                title: project.title,
-                author: project.author,
-                description: project.description,
-                downloads: project.downloads,
-                iconUrl: project.iconUrl,
-                fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
-            )
-        }
-        await MainActor.run {
-            topModpacks = items
-        }
-    }
-
-    private func loadPopularMods() async {
-        let result = await ModrinthService.searchProjects(
-            facets: [["project_type:mod"]],
-            offset: 0,
-            limit: 15,
-            query: nil
-        )
-        let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
-        let top10 = Array(sorted.prefix(10))
-        let items = top10.map { project in
-            let hue = Double(abs(project.slug.hashValue) % 360) / 360.0
-            return ModpackHeroItem(
-                id: project.projectId,
-                title: project.title,
-                author: project.author,
-                description: project.description,
-                downloads: project.downloads,
-                iconUrl: project.iconUrl,
-                fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
-            )
-        }
-        await MainActor.run {
-            popularMods = items
-        }
-    }
-
     private func downloadCountString(_ count: Int) -> String {
         if count >= 1_000_000 {
             String(format: "%.1fM", Double(count) / 1_000_000.0)
@@ -317,7 +204,6 @@ struct ExploreView: View {
 }
 
 // MARK: - Explore Filter View
-
 struct ExploreFilterView: View {
     let resourceType: ResourceType
     let onDismiss: () -> Void
@@ -337,7 +223,9 @@ struct ExploreFilterView: View {
                     }
                 }
                 .buttonStyle(.plain)
+
                 Spacer()
+
                 HStack(spacing: 6) {
                     Image(systemName: resourceType.systemImage)
                     Text(resourceType.localizedName)
@@ -347,7 +235,9 @@ struct ExploreFilterView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 8)
             .background(.bar)
+
             Divider()
+
             // Filter content
             CategoryContentView(
                 project: resourceType.rawValue,

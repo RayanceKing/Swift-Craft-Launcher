@@ -20,6 +20,7 @@ struct GameCreationView: View {
     @StateObject private var viewModel: GameCreationViewModel
     @EnvironmentObject private var gameRepository: GameRepository
     @EnvironmentObject private var playerListViewModel: PlayerListViewModel
+    @ObservedObject private var gameCreationManager = AppServices.gameCreationManager
     @Environment(\.dismiss)
     private var dismiss
 
@@ -84,6 +85,11 @@ struct GameCreationView: View {
         .onDisappear {
             // 页面关闭后清除所有数据
             clearAllData()
+
+            // 如果下载尚未开始则取消创建流程；如果下载已开始，则保持下载窗口
+            if !gameCreationManager.isDownloading {
+                gameCreationManager.cancelGameCreation()
+            }
         }
     }
 

@@ -3,76 +3,104 @@ import SwiftUI
 struct GameLibraryCard: View {
     let game: GameVersionInfo
     let isHovered: Bool
+    let onSelect: () -> Void
     let onLaunch: () -> Void
 
     var body: some View {
-        Button(action: onLaunch) {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
+            HStack(alignment: .top, spacing: 16) {
                 gameArtwork
-                    .frame(height: 140)
-                    .clipped()
+                    .frame(width: 72, height: 72)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: .black.opacity(0.14), radius: 4, y: 2)
 
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 8) {
+                    if !game.modLoader.isEmpty && game.modLoader != "vanilla" {
+                        Text(game.modLoader.capitalized)
+                            .font(.caption2.weight(.semibold))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.white.opacity(0.08)))
+                            .foregroundStyle(.secondary)
+                    }
+
                     Text(game.gameName)
-                        .font(.headline)
-                        .lineLimit(1)
+                        .font(.headline.weight(.semibold))
+                        .lineLimit(2)
                         .foregroundColor(.primary)
 
-                    HStack(spacing: 6) {
-                        if !game.modLoader.isEmpty && game.modLoader != "vanilla" {
-                            Text(game.modLoader.capitalized)
-                                .font(.caption2.weight(.medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.accentColor.opacity(0.15)))
-                                .foregroundColor(.accentColor)
-                        }
+                    Text("\("saveinfo.world.detail.label.last_played".localized())：\(relativeDateString(for: game.lastPlayed) ?? "-")")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+
+                    HStack(spacing: 8) {
                         Text("MC \(game.gameVersion)")
-                            .font(.caption2)
+                            .font(.caption2.weight(.medium))
                             .foregroundColor(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Capsule().fill(Color.white.opacity(0.05)))
 
-                        Spacer()
-
-                        if let formatted = relativeDateString(for: game.lastPlayed) {
-                            Text(formatted)
-                                .font(.caption2)
-                                .foregroundColor(.secondary)
-                                .lineLimit(1)
-                        }
+                        Spacer(minLength: 0)
                     }
+
+                    Button(action: onLaunch) {
+                        Text("开始游戏")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(Capsule().fill(Color.white.opacity(0.16)))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 2)
                 }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer(minLength: 0)
             }
-            .background(RoundedRectangle(cornerRadius: 14).fill(Color(.controlBackgroundColor)))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isHovered ? Color.accentColor.opacity(0.4) : Color.clear, lineWidth: 2)
-            )
-            .shadow(color: .black.opacity(isHovered ? 0.12 : 0.05), radius: isHovered ? 10 : 4, y: isHovered ? 4 : 2)
+            .padding(18)
         }
-        .buttonStyle(.plain)
-        .scaleEffect(isHovered ? 1.03 : 1.0)
+        .frame(maxWidth: .infinity, maxHeight: 148, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color(.controlBackgroundColor).opacity(0.96))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(isHovered ? Color.white.opacity(0.14) : Color.white.opacity(0.05), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(isHovered ? 0.16 : 0.08), radius: isHovered ? 14 : 8, y: isHovered ? 6 : 3)
+        .scaleEffect(isHovered ? 1.01 : 1.0)
         .animation(.easeInOut(duration: 0.18), value: isHovered)
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onTapGesture(perform: onSelect)
     }
 
     @ViewBuilder private var gameArtwork: some View {
         let profileDir = AppPaths.profileDirectory(gameName: game.gameName)
         let iconURL = profileDir.appendingPathComponent(game.gameIcon)
-        if FileManager.default.fileExists(atPath: iconURL.path) {
-            AsyncImage(url: iconURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image.resizable().interpolation(.none).scaledToFill()
-                case .failure, .empty:
-                    artworkPlaceholder
-                @unknown default:
-                    artworkPlaceholder
+        ZStack {
+            if FileManager.default.fileExists(atPath: iconURL.path) {
+                AsyncImage(url: iconURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .interpolation(.none)
+                            .scaledToFill()
+                    case .failure, .empty:
+                        artworkPlaceholder
+                    @unknown default:
+                        artworkPlaceholder
+                    }
                 }
+            } else {
+                artworkPlaceholder
             }
-        } else {
-            artworkPlaceholder
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .clipped()
     }
 
     private var artworkPlaceholder: some View {

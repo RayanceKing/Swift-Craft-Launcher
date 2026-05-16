@@ -16,8 +16,31 @@
     "…" : {
       "shouldTranslate" : false
     },
+    "%@" : {
+
+    },
+    "%@：%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@：%2$@"
+          }
+        }
+      }
+    },
     "%lld" : {
       "shouldTranslate" : false
+    },
+    "%lld MB - %lld MB" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld MB - %2$lld MB"
+          }
+        }
+      }
     },
     "%lld MB-%lld MB" : {
       "localizations" : {
@@ -93186,7 +93209,25 @@
     "与朋友一起玩，游戏更有趣" : {
 
     },
+    "你的游戏" : {
+
+    },
     "共 %lld 个" : {
+
+    },
+    "取消" : {
+
+    },
+    "后台运行" : {
+
+    },
+    "开始游戏" : {
+
+    },
+    "正在创建中..." : {
+
+    },
+    "点击下方按钮直接启动这个游戏版本。" : {
 
     }
   },

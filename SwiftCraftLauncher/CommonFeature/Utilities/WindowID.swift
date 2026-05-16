@@ -15,6 +15,7 @@ enum WindowID: String {
     case aiChat = "aiChat"
     case javaDownload = "javaDownload"
     case skinPreview = "skinPreview"
+    case gameDownload = "gameDownload"
 }
 
 extension WindowID: CaseIterable {}

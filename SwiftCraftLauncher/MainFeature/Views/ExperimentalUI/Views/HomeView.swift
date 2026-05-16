@@ -3,41 +3,38 @@ import SwiftUI
 struct HomeView: View {
     @Binding var selectedTab: ExperimentalTab
     @EnvironmentObject var gameRepository: GameRepository
-    @State private var modpackItems: [ModpackHeroItem] = []
+    @EnvironmentObject var contentStore: ExperimentalContentStore
     @State private var currentIndex: Int = 0
-    @State private var isLoading = true
 
     var body: some View {
         GeometryReader { geometry in
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    if isLoading {
-                        loadingView(height: geometry.size.height)
-                    } else if modpackItems.isEmpty {
-                        fallbackView
-                    } else {
-                        heroSection(height: geometry.size.height * 0.72)
-                        bottomStrip
+            if contentStore.isHomeLoading {
+                loadingView
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+            } else {
+                ScrollView(.vertical, showsIndicators: false) {
+                    VStack(spacing: 0) {
+                        if contentStore.homeModpackItems.isEmpty {
+                            fallbackView
+                        } else {
+                            heroSection(height: geometry.size.height * 0.72)
+                            bottomStrip
+                        }
                     }
                 }
             }
         }
         .task {
-            await loadModpackHeroItems()
+            await contentStore.loadHomeIfNeeded()
         }
     }
 
     // MARK: - Loading
 
-    private func loadingView(height: CGFloat) -> some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                ProgressView().controlSize(.large)
-                Spacer()
-            }
-            Spacer()
+    private var loadingView: some View {
+        ZStack {
+            ProgressView()
+                .controlSize(.large)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -45,7 +42,7 @@ struct HomeView: View {
     // MARK: - Hero
 
     private func heroSection(height: CGFloat) -> some View {
-        ModpackHeroCarousel(items: modpackItems, currentIndex: $currentIndex)
+        ModpackHeroCarousel(items: contentStore.homeModpackItems, currentIndex: $currentIndex)
             .frame(height: height)
     }
 
@@ -62,7 +59,7 @@ struct HomeView: View {
             .padding(.top, 24)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
-                    ForEach(modpackItems) { item in
+                    ForEach(contentStore.homeModpackItems) { item in
                         miniCard(for: item)
                     }
                 }
@@ -153,43 +150,4 @@ struct HomeView: View {
             }
         }
     }
-
-    // MARK: - Data
-
-    private func loadModpackHeroItems() async {
-        let result = await ModrinthService.searchProjects(
-            facets: [["project_type:modpack"]],
-            offset: 0,
-            limit: 20,
-            query: nil
-        )
-        let sorted = result.hits.sorted(by: { $0.downloads > $1.downloads })
-        let top10 = Array(sorted.prefix(10))
-        let items: [ModpackHeroItem] = top10.map { project in
-            let hue = Double(abs(project.slug.hashValue) % 360) / 360.0
-            return ModpackHeroItem(
-                id: project.projectId,
-                title: project.title,
-                author: project.author,
-                description: project.description,
-                downloads: project.downloads,
-                iconUrl: project.iconUrl,
-                fallbackColor: Color(hue: hue, saturation: 0.4, brightness: 0.8)
-            )
-        }
-        await MainActor.run {
-            modpackItems = items
-            isLoading = false
-        }
-    }
-}
-
-struct ModpackHeroItem: Identifiable {
-    let id: String
-    let title: String
-    let author: String
-    let description: String
-    let downloads: Int
-    let iconUrl: String?
-    let fallbackColor: Color
 }

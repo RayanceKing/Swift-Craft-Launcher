@@ -5,6 +5,7 @@
 //
 
 import SwiftUI
+import Combine
 import UniformTypeIdentifiers
 
 // MARK: - Game Creation View Model
@@ -33,6 +34,7 @@ class GameCreationViewModel: BaseGameFormViewModel {
     var pendingIconURL: URL?
     var didInit = false
     let gameSettingsManager: GameSettingsManager
+    private var downloadStateCancellable: AnyCancellable?
 
     // MARK: - Environment Objects (to be set from view)
     var gameRepository: GameRepository?
@@ -68,10 +70,38 @@ class GameCreationViewModel: BaseGameFormViewModel {
             }
         }
         updateParentState()
+
+        // 监听下载状态变化并转发到 GameCreationManager，用于更新下载窗口
+        downloadStateCancellable = gameSetupService.downloadState.objectWillChange.sink { [weak self] in
+            Task { @MainActor in
+                guard let self = self else { return }
+                let ds = self.gameSetupService.downloadState
+                let progress = max(ds.coreProgress, ds.resourcesProgress)
+                let file = ds.currentCoreFile.isEmpty ? ds.currentResourceFile : ds.currentCoreFile
+                AppServices.gameCreationManager.updateDownloadProgress(fileName: file, progress: progress)
+            }
+        }
     }
 
     // MARK: - Override Methods
     override func performConfirmAction() async {
+        // 构建临时占位游戏信息用于在下载窗口展示
+        let tempGame = GameVersionInfo(
+            gameName: gameNameValidator.gameName.isEmpty ? "New Game" : gameNameValidator.gameName,
+            gameIcon: gameIcon,
+            gameVersion: selectedGameVersion,
+            assetIndex: "",
+            modLoader: selectedModLoader,
+            lastPlayed: Date()
+        )
+
+        // 立即关闭表单（由父视图传入的 onConfirm 将处理 dismiss）
+        configuration.actions.onConfirm()
+
+        // 打开下载窗口并展示占位信息
+        AppServices.gameCreationManager.startGameDownload(game: tempGame)
+
+        // 开始实际的保存与下载流程
         startDownloadTask {
             await self.saveGame()
         }
