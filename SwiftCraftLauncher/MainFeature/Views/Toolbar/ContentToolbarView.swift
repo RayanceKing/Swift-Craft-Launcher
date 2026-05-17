@@ -1,4 +1,5 @@
 import SwiftUI
+import MinecraftFriendsKit
 
 /// 内容区域工具栏内容
 public struct ContentToolbarView: ToolbarContent {

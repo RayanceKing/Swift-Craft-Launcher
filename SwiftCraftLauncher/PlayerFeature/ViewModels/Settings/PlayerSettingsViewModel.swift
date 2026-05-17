@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import MinecraftFriendsKit
 
 @MainActor
 final class PlayerSettingsViewModel: ObservableObject {
@@ -12,19 +13,20 @@ final class PlayerSettingsViewModel: ObservableObject {
 
     private let friendsService: MinecraftFriendsService
     private let authService: MinecraftAuthService
-    private let dataManager: PlayerDataManager
-    private let errorHandler: GlobalErrorHandler
+    private let sideEffects: MinecraftFriendsMicrosoftPlayerSideEffects
 
     init(
-        friendsService: MinecraftFriendsService = .shared,
+        friendsService: MinecraftFriendsService = AppServices.minecraftFriendsService,
         authService: MinecraftAuthService = .shared,
         dataManager: PlayerDataManager = PlayerDataManager(),
         errorHandler: GlobalErrorHandler = AppServices.errorHandler
     ) {
         self.friendsService = friendsService
         self.authService = authService
-        self.dataManager = dataManager
-        self.errorHandler = errorHandler
+        self.sideEffects = MinecraftFriendsMicrosoftPlayerSideEffects(
+            dataManager: dataManager,
+            errorHandler: errorHandler
+        )
     }
 
     func refreshAuthlibInjectorExists() {
@@ -48,16 +50,14 @@ final class PlayerSettingsViewModel: ObservableObject {
             _ = try await DownloadManager.downloadFile(
                 urlString: downloadURL.absoluteString,
                 destinationURL: authlibInjectorJarURL,
-                expectedSha1: nil
+        self.friendsService = friendsService
+        self.authService = authService
+        self.sideEffects = MinecraftFriendsMicrosoftPlayerSideEffects(
+            dataManager: dataManager,
+            errorHandler: errorHandler
+        )
             )
-            authlibInjectorExists = true
-        } catch {
-            let globalError = GlobalError.download(
-                chineseMessage: "下载 authlib-injector 失败: \(error.localizedDescription)",
-                i18nKey: "error.download.authlib_injector_failed",
-                level: .notification
-            )
-            errorHandler.handle(globalError)
+            sideEffects.handle(globalError)
         }
     }
 
@@ -68,7 +68,7 @@ final class PlayerSettingsViewModel: ObservableObject {
     }
 
     func reloadMinecraftFriendAccountPreferences(currentPlayer: Player?) async {
-        guard let player = currentPlayer, player.canUseMicrosoftMinecraftServices else {
+        guard let player = currentPlayer, player.isOnlineAccount else {
             clearMinecraftFriendAccountPreferences()
             return
         }
@@ -76,7 +76,7 @@ final class PlayerSettingsViewModel: ObservableObject {
         isLoadingMinecraftFriendAccountPreferences = true
         defer { isLoadingMinecraftFriendAccountPreferences = false }
 
-        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: reportMissingAccessToken) else {
+        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: sideEffects.reportMissingAccessToken) else {
             minecraftFriendAccountPreferences = nil
             return
         }
@@ -85,9 +85,10 @@ final class PlayerSettingsViewModel: ObservableObject {
             minecraftFriendAccountPreferences = try await friendsService.fetchFriendAccountPreferences(
                 accessToken: tokenPlayer.authAccessToken
             )
+            NotificationCenter.default.post(name: .minecraftFriendsAccountPreferencesDidChange, object: nil)
         } catch {
             minecraftFriendAccountPreferences = nil
-            errorHandler.handle(GlobalError.from(error))
+            sideEffects.reportGlobalError(error)
         }
     }
 
@@ -114,8 +115,8 @@ final class PlayerSettingsViewModel: ObservableObject {
         enableFriendlist: Bool,
         enableFriendInvites: Bool
     ) async {
-        guard let player = currentPlayer, player.canUseMicrosoftMinecraftServices else { return }
-        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: reportMissingAccessToken) else { return }
+        guard let player = currentPlayer, player.isOnlineAccount else { return }
+        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: sideEffects.reportMissingAccessToken) else { return }
 
         isSavingMinecraftFriendAccountPreferences = true
         defer { isSavingMinecraftFriendAccountPreferences = false }
@@ -129,17 +130,16 @@ final class PlayerSettingsViewModel: ObservableObject {
             minecraftFriendAccountPreferences = try await friendsService.fetchFriendAccountPreferences(
                 accessToken: tokenPlayer.authAccessToken
             )
+            NotificationCenter.default.post(name: .minecraftFriendsAccountPreferencesDidChange, object: nil)
         } catch {
-            errorHandler.handle(GlobalError.from(error))
+            sideEffects.reportGlobalError(error)
             await reloadMinecraftFriendAccountPreferences(currentPlayer: currentPlayer)
         }
     }
 
     private func preparedTokenPlayer(for player: Player, onMissingCredential: () -> Void) async -> Player? {
         var resolved = player
-        if resolved.credential == nil {
-            resolved.credential = dataManager.loadCredential(userId: resolved.id)
-        }
+        sideEffects.loadCredentialFromDiskIfMissing(into: &resolved)
         guard !resolved.authAccessToken.isEmpty else {
             onMissingCredential()
             return nil
@@ -148,31 +148,108 @@ final class PlayerSettingsViewModel: ObservableObject {
         do {
             let tokenPlayer = try await authService.validateAndRefreshPlayerTokenThrowing(for: resolved)
             if tokenPlayer.authAccessToken != resolved.authAccessToken {
-                persistPlayerIfNeeded(tokenPlayer)
+                sideEffects.persistPlayerIfNeeded(tokenPlayer)
             }
             return tokenPlayer
         } catch {
-            errorHandler.handle(GlobalError.from(error))
+            sideEffects.reportGlobalError(error)
             return nil
         }
     }
 
-    private func reportMissingAccessToken() {
-        errorHandler.handle(
-            GlobalError.authentication(
-                chineseMessage: "缺少 Minecraft 访问令牌，请重新登录该正版账号",
-                i18nKey: "error.authentication.missing_token",
-                level: .notification
+    func clearMinecraftFriendAccountPreferences() {
+        minecraftFriendAccountPreferences = nil
+        isLoadingMinecraftFriendAccountPreferences = false
+        isSavingMinecraftFriendAccountPreferences = false
+    }
+
+    func reloadMinecraftFriendAccountPreferences(currentPlayer: Player?) async {
+        guard let player = currentPlayer, player.isOnlineAccount else {
+            clearMinecraftFriendAccountPreferences()
+            return
+        }
+
+        isLoadingMinecraftFriendAccountPreferences = true
+        defer { isLoadingMinecraftFriendAccountPreferences = false }
+
+        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: sideEffects.reportMissingAccessToken) else {
+            minecraftFriendAccountPreferences = nil
+            return
+        }
+
+        do {
+            minecraftFriendAccountPreferences = try await friendsService.fetchFriendAccountPreferences(
+                accessToken: tokenPlayer.authAccessToken
             )
+            NotificationCenter.default.post(name: .minecraftFriendsAccountPreferencesDidChange, object: nil)
+        } catch {
+            minecraftFriendAccountPreferences = nil
+            sideEffects.reportGlobalError(error)
+        }
+    }
+
+    func setMinecraftFriendListEnabled(_ enabled: Bool, currentPlayer: Player?) async {
+        let invitesOn = minecraftFriendAccountPreferences?.acceptInvites == .enabled
+        await persistMinecraftFriendAccountPreferences(
+            currentPlayer: currentPlayer,
+            enableFriendlist: enabled,
+            enableFriendInvites: invitesOn
         )
     }
 
-    private func persistPlayerIfNeeded(_ updated: Player) {
-        guard dataManager.updatePlayerSilently(updated) else { return }
-        NotificationCenter.default.post(
-            name: .playerUpdated,
-            object: nil,
-            userInfo: ["updatedPlayer": updated]
+    func setMinecraftFriendAcceptInvitesEnabled(_ enabled: Bool, currentPlayer: Player?) async {
+        let friendsOn = minecraftFriendAccountPreferences?.friends == .enabled
+        await persistMinecraftFriendAccountPreferences(
+            currentPlayer: currentPlayer,
+            enableFriendlist: friendsOn,
+            enableFriendInvites: enabled
         )
+    }
+
+    private func persistMinecraftFriendAccountPreferences(
+        currentPlayer: Player?,
+        enableFriendlist: Bool,
+        enableFriendInvites: Bool
+    ) async {
+        guard let player = currentPlayer, player.isOnlineAccount else { return }
+        guard let tokenPlayer = await preparedTokenPlayer(for: player, onMissingCredential: sideEffects.reportMissingAccessToken) else { return }
+
+        isSavingMinecraftFriendAccountPreferences = true
+        defer { isSavingMinecraftFriendAccountPreferences = false }
+
+        do {
+            try await friendsService.updateFriendSettings(
+                accessToken: tokenPlayer.authAccessToken,
+                enableFriendlist: enableFriendlist,
+                enableFriendInvites: enableFriendInvites
+            )
+            minecraftFriendAccountPreferences = try await friendsService.fetchFriendAccountPreferences(
+                accessToken: tokenPlayer.authAccessToken
+            )
+            NotificationCenter.default.post(name: .minecraftFriendsAccountPreferencesDidChange, object: nil)
+        } catch {
+            sideEffects.reportGlobalError(error)
+            await reloadMinecraftFriendAccountPreferences(currentPlayer: currentPlayer)
+        }
+    }
+
+    private func preparedTokenPlayer(for player: Player, onMissingCredential: () -> Void) async -> Player? {
+        var resolved = player
+        sideEffects.loadCredentialFromDiskIfMissing(into: &resolved)
+        guard !resolved.authAccessToken.isEmpty else {
+            onMissingCredential()
+            return nil
+        }
+
+        do {
+            let tokenPlayer = try await authService.validateAndRefreshPlayerTokenThrowing(for: resolved)
+            if tokenPlayer.authAccessToken != resolved.authAccessToken {
+                sideEffects.persistPlayerIfNeeded(tokenPlayer)
+            }
+            return tokenPlayer
+        } catch {
+            sideEffects.reportGlobalError(error)
+            return nil
+        }
     }
 }
