@@ -45,6 +45,6 @@ final class MinecraftFriendsSheetHostAdapter: MinecraftFriendsSheetHost {
     }
 
     func skinTextureURL(uuidNoHyphens: String) async -> String? {
-        await AppServices.minecraftFriendsService.resolveSessionProfileSkinTextureURL(uuidNoHyphens: uuidNoHyphens)
+        await MinecraftSessionProfileSkinResolver.resolveTextureURLString(uuidNoHyphens: uuidNoHyphens)
     }
 }

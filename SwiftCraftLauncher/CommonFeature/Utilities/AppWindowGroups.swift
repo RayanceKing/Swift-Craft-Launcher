@@ -102,7 +102,6 @@ private struct GameDownloadProgressWindowContent: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("\(game.gameName)")
                             .font(.headline.weight(.semibold))
-                        
                         if !gameCreationManager.currentDownloadFile.isEmpty {
                             Text(gameCreationManager.currentDownloadFile)
                                 .font(.caption)
@@ -110,26 +109,20 @@ private struct GameDownloadProgressWindowContent: View {
                                 .lineLimit(1)
                         }
                     }
-                    
                     Spacer()
-                    
                     Text("\(Int(gameCreationManager.downloadProgress * 100))%")
                         .font(.caption.weight(.semibold))
                         .foregroundColor(.secondary)
                 }
             }
-            
             ProgressView(value: gameCreationManager.downloadProgress)
                 .progressViewStyle(.linear)
-            
             HStack(spacing: 12) {
                 Button("取消") {
                     gameCreationManager.cancelGameCreation()
                 }
                 .keyboardShortcut(.cancelAction)
-                
                 Spacer()
-                
                 Button("后台运行") {
                     // 不需要做什么，只是关闭窗口
                     // 下载会继续在后台进行

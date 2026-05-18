@@ -21,7 +21,7 @@ final class MinecraftFriendsPresencePollingCoordinator {
         AppServices.playerSettingsManager.enableMinecraftFriendsPresenceNotifications
 
     private init(
-        friendsService: MinecraftFriendsService = AppServices.minecraftFriendsService
+        friendsService: MinecraftFriendsKit.MinecraftFriendsService = .init()
     ) {
         hostAdapter = MinecraftFriendsPresenceMonitorHostAdapter()
         credentialSideEffects = MinecraftFriendsMicrosoftPlayerSideEffects(
