@@ -4,6 +4,9 @@
     "" : {
       "shouldTranslate" : false
     },
+    " " : {
+
+    },
     " %lld" : {
       "shouldTranslate" : false
     },
@@ -15,9 +18,6 @@
     },
     "…" : {
       "shouldTranslate" : false
-    },
-    "%@" : {
-
     },
     "%@：%@" : {
       "localizations" : {
@@ -62371,6 +62371,9 @@
         }
       }
     },
+    "Preparing..." : {
+
+    },
     "processor.executing" : {
       "comment" : "Processor Progress Messages",
       "extractionState" : "manual",
@@ -93624,12 +93627,6 @@
 
     },
     "共 %lld 个" : {
-
-    },
-    "取消" : {
-
-    },
-    "后台运行" : {
 
     },
     "开始游戏" : {

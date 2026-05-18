@@ -1,5 +1,65 @@
 import SwiftUI
 
+// MARK: - Unified Download Progress Window (supports multiple download rows)
+
+struct DownloadProgressWindow: View {
+    @ObservedObject var progressManager: DownloadProgressManager
+
+    init(progressManager: DownloadProgressManager = DownloadProgressManager.shared) {
+        self.progressManager = progressManager
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if progressManager.tasks.isEmpty {
+                emptyStateView
+            } else {
+                ForEach(Array(progressManager.tasks.enumerated()), id: \.element.id) { index, task in
+                    DownloadItemView(
+                        icon: task.icon,
+                        title: task.title,
+                        subtitle: task.subtitle,
+                        progress: task.progress,
+                        status: mapStatus(task.status, progress: task.progress),
+                        onAction: { task.onAction?() }
+                    )
+                    if index < progressManager.tasks.count - 1 {
+                        Divider()
+                            .padding(.leading, 26)
+                            .padding(.bottom, 4)
+                    }
+                }
+            }
+        }
+        .padding(12)
+    }
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "tray")
+                .font(.system(size: 24))
+                .foregroundColor(.secondary)
+            Text("download.no.tasks".localized())
+                .font(.headline)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func mapStatus(_ status: DownloadTaskStatus, progress: Double) -> DownloadStatus {
+        switch status {
+        case .downloading:
+            return .downloading(progress: progress)
+        case .completed:
+            return .completed
+        case .error:
+            return .error
+        }
+    }
+}
+
+// MARK: - Legacy Java Download Progress Window (backward compat)
+
 struct JavaDownloadProgressWindow: View {
     @ObservedObject var downloadState: JavaDownloadState
     @Environment(\.dismiss)
@@ -15,34 +75,30 @@ struct JavaDownloadProgressWindow: View {
     }
 
     var body: some View {
-        // 下载项列表
         VStack {
             if downloadState.hasError {
-                // 错误状态 要显示重试按钮
                 DownloadItemView(
                     icon: "exclamationmark.triangle.fill",
                     title: downloadState.version,
                     subtitle: downloadState.errorMessage,
+                    progress: downloadState.progress,
                     status: .error,
-                    onCancel: {
+                    onAction: {
                         javaDownloadManager.retryDownload()
-                    },
-                    downloadState: downloadState
+                    }
                 )
             } else if downloadState.isDownloading {
-                // 下载中状态
                 DownloadItemView(
                     icon: "cup.and.saucer.fill",
                     title: downloadState.version,
                     subtitle: downloadState.currentFile.isEmpty ? "Preparing..." : downloadState.currentFile,
+                    progress: downloadState.progress,
                     status: .downloading(progress: downloadState.progress),
-                    onCancel: {
+                    onAction: {
                         javaDownloadManager.cancelDownload()
-                    },
-                    downloadState: downloadState
+                    }
                 )
             } else {
-                // 没有下载任务时的空状态
                 VStack(spacing: 16) {
                     Image(systemName: "tray")
                         .font(.system(size: 24))
@@ -56,118 +112,182 @@ struct JavaDownloadProgressWindow: View {
         }
         .padding()
         .onAppear {
-            // 设置窗口关闭回调
             javaDownloadManager.setDismissCallback {
                 dismiss()
             }
         }
-        .onDisappear {
-            clearAllData()
-        }
-    }
-
-    /// 清理所有数据
-    private func clearAllData() {
-        // 窗口关闭时清理数据
     }
 }
 
-// 下载项视图
+// MARK: - Download Item View
+
 struct DownloadItemView: View {
     let icon: String
     let title: String
     let subtitle: String
+    let progress: Double
     let status: DownloadStatus
-    let onCancel: () -> Void
-    let downloadState: JavaDownloadState?
+    let onAction: () -> Void
 
+    @ViewBuilder
     var body: some View {
-        HStack(spacing: 12) {
-            // 图标
-            ZStack {
+        switch status {
+        case .completed:
+            completedBody
+        case .error:
+            errorBody
+        case .downloading where isPreparing:
+            preparingBody
+        case .downloading:
+            downloadingBody
+        case .cancelled:
+            preparingBody
+        }
+    }
+
+    // MARK: - Completed
+
+    private var completedBody: some View {
+        HStack(alignment: .center, spacing: 8) {
+            ZStack(alignment: .bottomTrailing) {
                 Image(systemName: icon)
-                    .font(.system(size: 24))
-                    .foregroundColor(iconColor)
+                    .font(.system(size: 18))
+                    .foregroundColor(.secondary)
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(.green)
+                    .background(Circle().fill(Color.white).frame(width: 8, height: 8))
             }
 
-            // 内容
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(" ")
+                    .font(.subheadline.weight(.semibold))
+                    .hidden()
+
+                HStack(spacing: 4) {
                     Text(title)
-                        .font(.headline)
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(.primary)
                     Spacer()
-                    Text("\(Int((downloadState?.progress ?? 0) * 100))%")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    Spacer().frame(width: 14)
                 }
 
-                // 进度条和进度信息（仅在下载中时显示）
-                if case .downloading(let progress) = status {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ProgressView(value: progress)
-                            .progressViewStyle(LinearProgressViewStyle())
-                    }
-                }
+                Text(" ")
+                    .font(.caption2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 3)
+    }
+
+    // MARK: - Error
+
+    private var errorBody: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 18))
+                .foregroundColor(.red)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+                Text(displaySubtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            // 操作按钮（取消/重试）
-            Button(action: onCancel) {
-                Image(systemName: buttonIcon)
-                    .foregroundColor(buttonColor)
+            Button(action: onAction) {
+                Image(systemName: "arrow.clockwise.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.blue)
             }
             .buttonStyle(.plain)
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 3)
     }
 
-    private var iconColor: Color {
-        switch status {
-        case .downloading:
-            return .accentColor
-        case .error:
-            return .red
-        default:
-            return .accentColor
+    // MARK: - Preparing
+
+    private var preparingBody: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(.secondary)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+                Text("Preparing...")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button(action: onAction) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
+            }
+            .buttonStyle(.plain)
         }
+        .padding(.vertical, 3)
     }
 
-    private var iconBackgroundColor: Color {
-        switch status {
-        case .downloading:
-            return Color.blue.opacity(0.1)
-        case .error:
-            return Color.red.opacity(0.1)
-        default:
-            return .accentColor
+    // MARK: - Downloading
+
+    private var downloadingBody: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 18))
+                .foregroundColor(.accentColor)
+
+            VStack(alignment: .leading, spacing: 0) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+
+                HStack(alignment: .center, spacing: 4) {
+                    ProgressView(value: progress)
+                        .progressViewStyle(LinearProgressViewStyle())
+                        .frame(maxWidth: .infinity)
+
+                    Button(action: onAction) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Text("\(Int(progress * 100))%")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .padding(.vertical, 3)
     }
 
-    private var buttonIcon: String {
-        switch status {
-        case .downloading:
-            return "xmark.circle.fill"  // 取消图标
-        case .error:
-            return "arrow.clockwise.circle.fill"  // 重试图标
-        case .completed, .cancelled:
-            return "xmark.circle.fill"  // 默认关闭图标
-        }
+    // MARK: - Helpers
+
+    private var isPreparing: Bool {
+        subtitle == "Preparing..."
     }
 
-    private var buttonColor: Color {
-        switch status {
-        case .downloading:
-            return .secondary  // 取消按钮用次要颜色
-        case .error:
-            return .blue  // 重试按钮用蓝色
-        case .completed, .cancelled:
-            return .secondary  // 默认次要颜色
+    private var displaySubtitle: String {
+        if subtitle.isEmpty || subtitle == "Preparing..." {
+            return subtitle
         }
+        return URL(fileURLWithPath: subtitle).lastPathComponent
     }
 }
 
-// 下载状态枚举
+// MARK: - Download Status Enum
+
 enum DownloadStatus {
     case downloading(progress: Double)
     case completed

@@ -50,6 +50,7 @@ enum AppServices {
         var javaRuntimeService: JavaRuntimeService?
         var javaDownloadManager: JavaDownloadManager?
         var gameCreationManager: GameCreationManager?
+        var downloadProgressManager: DownloadProgressManager?
 
         // MARK: - Feature managers
         var aiSettingsManager: AISettingsManager?
@@ -199,6 +200,12 @@ enum AppServices {
             return injected
         }
         return sharedOnMainActor { GameCreationManager.shared }
+    }
+    static var downloadProgressManager: DownloadProgressManager {
+        if let injected = lock.withLock({ dependencies.downloadProgressManager }) {
+            return injected
+        }
+        return sharedOnMainActor { DownloadProgressManager.shared }
     }
 
     // MARK: - Feature managers

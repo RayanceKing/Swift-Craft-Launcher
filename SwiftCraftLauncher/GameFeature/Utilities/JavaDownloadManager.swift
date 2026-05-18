@@ -9,17 +9,18 @@ class JavaDownloadManager: ObservableObject {
     @Published var isWindowVisible = false
 
     private let javaRuntimeService: JavaRuntimeService
-    private let windowManager: WindowManager
+    private let progressManager: DownloadProgressManager
     private var dismissCallback: (() -> Void)?
     private var currentDownloadTask: Task<Void, Error>?
     private var cancelRequested = false
+    private var activeTaskItem: DownloadTaskItem?
 
     private init(
         javaRuntimeService: JavaRuntimeService = AppServices.javaRuntimeService,
-        windowManager: WindowManager = AppServices.windowManager
+        progressManager: DownloadProgressManager = DownloadProgressManager.shared
     ) {
         self.javaRuntimeService = javaRuntimeService
-        self.windowManager = windowManager
+        self.progressManager = progressManager
     }
 
     /// 设置窗口关闭回调
@@ -39,16 +40,29 @@ class JavaDownloadManager: ObservableObject {
             downloadState.startDownload(version: version)
             cancelRequested = false
 
-            // 显示下载弹窗
-            showDownloadWindow()
+            // 创建下载任务并注册到共享管理器
+            let taskItem = DownloadTaskItem(
+                icon: "cup.and.saucer.fill",
+                title: version,
+                subtitle: "Preparing...",
+                progress: 0,
+                status: .downloading,
+                onAction: { [weak self] in
+                    self?.cancelDownload()
+                }
+            )
+            activeTaskItem = taskItem
+            progressManager.addTask(taskItem)
+            isWindowVisible = true
 
             // 设置进度回调
             javaRuntimeService.setProgressCallback { [weak self] fileName, completed, total in
                 Task { @MainActor in
-                    // 检查是否已取消
                     guard let self = self, !self.downloadState.isCancelled else { return }
                     let progress = total > 0 ? Double(completed) / Double(total) : 0.0
                     self.downloadState.updateProgress(fileName: fileName, progress: progress)
+                    self.activeTaskItem?.subtitle = fileName
+                    self.activeTaskItem?.progress = progress
                 }
             }
 
@@ -71,10 +85,10 @@ class JavaDownloadManager: ObservableObject {
                 return
             }
 
-            // 下载完成 - 设置完成状态，稍后自动关闭窗口
+            // 下载完成 - 标记任务为已完成
             downloadState.isDownloading = false
-
-            closeWindow()
+            activeTaskItem?.status = .completed
+            isWindowVisible = progressManager.hasActiveTasks
         } catch {
             if error is CancellationError || downloadState.isCancelled || cancelRequested {
                 Logger.shared.info("Java下载任务已取消")
@@ -84,6 +98,12 @@ class JavaDownloadManager: ObservableObject {
             // 下载失败
             if !downloadState.isCancelled {
                 downloadState.setError(error.localizedDescription)
+                activeTaskItem?.icon = "exclamationmark.triangle.fill"
+                activeTaskItem?.subtitle = error.localizedDescription
+                activeTaskItem?.status = .error(error.localizedDescription)
+                activeTaskItem?.onAction = { [weak self] in
+                    self?.retryDownload()
+                }
             }
         }
     }
@@ -91,7 +111,7 @@ class JavaDownloadManager: ObservableObject {
     /// 取消下载
     func cancelDownload() {
         guard downloadState.isDownloading else {
-            closeWindow()
+            removeActiveTask()
             return
         }
         cancelRequested = true
@@ -102,31 +122,32 @@ class JavaDownloadManager: ObservableObject {
     /// 重试下载
     func retryDownload() {
         guard !downloadState.version.isEmpty else { return }
+        removeActiveTask()
         Task {
             await downloadJavaRuntime(version: downloadState.version)
         }
     }
 
-    /// 显示下载窗口
-    private func showDownloadWindow() {
-        windowManager.openWindow(id: .javaDownload)
-        isWindowVisible = true
+    /// 移除活跃任务
+    private func removeActiveTask() {
+        if let task = activeTaskItem {
+            progressManager.removeTask(task)
+            activeTaskItem = nil
+        }
+        isWindowVisible = progressManager.hasActiveTasks
+        dismissCallback?()
     }
 
-    /// 关闭窗口
+    /// 关闭窗口 (保留用于向后兼容)
     func closeWindow() {
-        windowManager.closeWindow(id: .javaDownload)
-        isWindowVisible = false
+        removeActiveTask()
         downloadState.reset()
-        dismissCallback?()
     }
 
     /// 清理取消的下载数据
     func cleanupCancelledDownload() {
-        // 清理已下载的部分文件
-        // 可添加清理逻辑
         Logger.shared.info("Cleaning up cancelled Java download for version: \(downloadState.version)")
-        // 重置状态并关闭窗口
-        closeWindow()
+        removeActiveTask()
+        downloadState.reset()
     }
 }

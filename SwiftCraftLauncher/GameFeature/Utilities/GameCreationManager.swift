@@ -12,12 +12,15 @@ class GameCreationManager: ObservableObject {
     @Published var currentDownloadFile: String = ""
     @Published var isWindowVisible = false
 
-    private let windowManager: WindowManager
+    private let progressManager: DownloadProgressManager
+
+    // 下载任务项（用于统一下载窗口）
+    private var gameTaskItem: DownloadTaskItem?
 
     private init(
-        windowManager: WindowManager = AppServices.windowManager
+        progressManager: DownloadProgressManager = DownloadProgressManager.shared
     ) {
-        self.windowManager = windowManager
+        self.progressManager = progressManager
     }
 
     /// 开始游戏创建 - 显示占位卡片
@@ -26,47 +29,70 @@ class GameCreationManager: ObservableObject {
         isCreatingGame = true
     }
 
-    /// 开始游戏下载 - 显示进度窗口（在表单确认后调用）
-    func startGameDownload(game: GameVersionInfo) {
+    /// 开始游戏下载 - 创建统一的游戏下载任务并显示进度窗口
+    func startGameDownload(game: GameVersionInfo, modLoader: String? = nil) {
         creatingGame = game
         isDownloading = true
         downloadProgress = 0.0
         currentDownloadFile = ""
-        showDownloadWindow()
+        isWindowVisible = true
+
+        // 创建统一的游戏下载任务
+        let gameTask = DownloadTaskItem(
+            icon: "gamecontroller.fill",
+            title: game.gameName,
+            subtitle: "Preparing...",
+            progress: 0,
+            status: .downloading,
+            onAction: { [weak self] in
+                self?.cancelGameCreation()
+            }
+        )
+        gameTaskItem = gameTask
+        progressManager.addTask(gameTask)
     }
 
-    /// 完成游戏创建
+    /// 更新游戏下载进度（统一核心+资源+加载器）
+    func updateGameProgress(fileName: String, progress: Double) {
+        gameTaskItem?.subtitle = fileName
+        gameTaskItem?.progress = progress
+        downloadProgress = progress
+        currentDownloadFile = fileName
+    }
+
+    /// 完成游戏创建 - 标记任务为已完成
     func completeGameCreation() {
+        gameTaskItem?.status = .completed
+        gameTaskItem?.progress = 1.0
         isCreatingGame = false
         isDownloading = false
         creatingGame = nil
-        closeWindow()
     }
 
     /// 取消游戏创建
     func cancelGameCreation() {
+        removeAllTasks()
         isCreatingGame = false
         isDownloading = false
         creatingGame = nil
-        closeWindow()
     }
 
-    /// 更新下载进度
+    /// 更新下载进度 (保留用于向后兼容)
     func updateDownloadProgress(fileName: String, progress: Double) {
         currentDownloadFile = fileName
         downloadProgress = progress
+        gameTaskItem?.subtitle = fileName
+        gameTaskItem?.progress = progress
     }
 
-    /// 显示下载窗口
-    private func showDownloadWindow() {
-        windowManager.openWindow(id: .gameDownload)
-        isWindowVisible = true
+    private func removeAllTasks() {
+        if let task = gameTaskItem { progressManager.removeTask(task); gameTaskItem = nil }
+        isWindowVisible = progressManager.hasActiveTasks
     }
 
-    /// 关闭下载窗口并清理状态
+    /// 关闭窗口并清理状态
     func closeWindow() {
-        windowManager.closeWindow(id: .gameDownload)
-        isWindowVisible = false
+        removeAllTasks()
         isDownloading = false
         downloadProgress = 0.0
         currentDownloadFile = ""
