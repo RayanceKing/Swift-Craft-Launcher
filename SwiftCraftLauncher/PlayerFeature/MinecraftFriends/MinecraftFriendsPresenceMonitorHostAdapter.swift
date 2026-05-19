@@ -11,7 +11,7 @@ final class MinecraftFriendsPresenceMonitorHostAdapter: MinecraftFriendsPresence
     init(
         player: Player? = nil,
         authService: MinecraftAuthService = AppServices.minecraftAuthService,
-        dataManager: PlayerDataManager = PlayerDataManager(),
+        dataManager: PlayerDataManager = AppServices.playerDataManager,
         errorHandler: GlobalErrorHandler = AppServices.errorHandler
     ) {
         self.player = player

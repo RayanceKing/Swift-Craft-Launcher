@@ -12,8 +12,9 @@ public struct ContentToolbarView: ToolbarContent {
     @EnvironmentObject private var gameRepository: GameRepository
     @State private var showEditSkin = false
     @State private var showingMinecraftFriendsSheet = false
+    @State private var minecraftFriendsSheetHost: MinecraftFriendsSheetHostAdapter?
     @StateObject private var viewModel = ContentToolbarViewModel()
-    @StateObject private var minecraftFriendsSheetViewModel = MinecraftFriendsSheetViewModel()
+    @StateObject private var minecraftFriendsSheetViewModel = MinecraftFriendsSheetViewModel(friendsService: AppServices.minecraftFriendsService)
     private let minecraftAuthService: MinecraftAuthService
     private let yggdrasilAuthService: YggdrasilAuthService
     private let premiumAccountFlagManager: PremiumAccountFlagManager
@@ -154,7 +155,10 @@ public struct ContentToolbarView: ToolbarContent {
                     Button {
                         Task {
                             guard let p = currentPlayer else { return }
-                            await minecraftFriendsSheetViewModel.load(player: p, forceRefresh: false)
+                            let host = MinecraftFriendsSheetHostAdapter(player: p)
+                            minecraftFriendsSheetHost = host
+                            minecraftFriendsSheetViewModel.prepare(playerId: p.id, host: host)
+                            await minecraftFriendsSheetViewModel.load(forceRefresh: false)
                             guard !Task.isCancelled, currentPlayer?.id == p.id else { return }
                             showingMinecraftFriendsSheet = true
                         }
@@ -169,8 +173,29 @@ public struct ContentToolbarView: ToolbarContent {
                     .help("minecraft.friends.toolbar.help".localized())
                     .disabled(minecraftFriendsSheetViewModel.isLoading && !showingMinecraftFriendsSheet)
                     .sheet(isPresented: $showingMinecraftFriendsSheet) {
-                        if let p = currentPlayer {
-                            MinecraftFriendsSheetView(player: p, viewModel: minecraftFriendsSheetViewModel)
+                        if let p = currentPlayer, minecraftFriendsSheetHost != nil {
+                            MinecraftFriendsSheetView(
+                                playerId: p.id,
+                                viewModel: minecraftFriendsSheetViewModel,
+                                localize: MinecraftFriendsSheetLocalize.resolver(
+                                    localeIdentifier: { AppServices.languageManager.selectedLanguage },
+                                    fallback: { $0.localized() }
+                                ),
+                                limitBodyScrollHeight: AppServices.generalSettingsManager.limitCommonSheetHeight
+                            ) { _, url in
+                                Group {
+                                    if let u = url, !u.isEmpty {
+                                        MinecraftSkinUtils(type: .url, src: u, size: 40)
+                                    } else {
+                                        ProgressView()
+                                            .controlSize(.small)
+                                            .frame(width: 40, height: 40)
+                                    }
+                                }
+                            }
+                            .onDisappear {
+                                minecraftFriendsSheetHost = nil
+                            }
                         }
                     }
                 }
