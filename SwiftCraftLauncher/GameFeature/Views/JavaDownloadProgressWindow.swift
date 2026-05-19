@@ -5,7 +5,11 @@ import SwiftUI
 struct DownloadProgressWindow: View {
     @ObservedObject var progressManager: DownloadProgressManager
 
-    init(progressManager: DownloadProgressManager = DownloadProgressManager.shared) {
+    init() {
+        self.progressManager = DownloadProgressManager()
+    }
+    // 如果需要自定义初始化器，可以添加这个方法
+    init(progressManager: DownloadProgressManager) {
         self.progressManager = progressManager
     }
 
@@ -129,17 +133,18 @@ struct DownloadItemView: View {
     let status: DownloadStatus
     let onAction: () -> Void
 
-    @ViewBuilder
     var body: some View {
         switch status {
         case .completed:
             completedBody
         case .error:
             errorBody
-        case .downloading where isPreparing:
-            preparingBody
-        case .downloading:
-            downloadingBody
+        case .downloading(progress: _):
+            if subtitle == "Preparing..." {
+                preparingBody
+            } else {
+                downloadingBody
+            }
         case .cancelled:
             preparingBody
         }

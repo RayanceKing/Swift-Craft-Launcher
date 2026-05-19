@@ -6,9 +6,18 @@ struct LibraryView: View {
     @EnvironmentObject var detailState: ResourceDetailState
     @EnvironmentObject var gameLaunchUseCase: GameLaunchUseCase
     @EnvironmentObject var playerListViewModel: PlayerListViewModel
+    @ObservedObject private var gameDialogsPresenter: GameDialogsPresenter
     @ObservedObject private var gameCreationManager = AppServices.gameCreationManager
+    @Environment(\.openSettings)
+    private var openSettings
     @State private var hoveredGameId: String?
     @State private var selectedGameForDetail: GameVersionInfo?
+
+    init(
+        gameDialogsPresenter: GameDialogsPresenter = AppServices.gameDialogsPresenter
+    ) {
+        _gameDialogsPresenter = ObservedObject(wrappedValue: gameDialogsPresenter)
+    }
 
     private let columns = [
         GridItem(.adaptive(minimum: 280, maximum: 360), spacing: 20, alignment: .top)
@@ -44,6 +53,15 @@ struct LibraryView: View {
                                         },
                                         onLaunch: {
                                             launchGame(game)
+                                        },
+                                        onDelete: {
+                                            gameDialogsPresenter.requestGameDeletion(of: game)
+                                        },
+                                        onOpenSettings: {
+                                            openSettings()
+                                        },
+                                        onExport: {
+                                            gameDialogsPresenter.presentModPackExport(for: game)
                                         }
                                     )
                                     .onHover { hovering in

@@ -44,14 +44,23 @@ extension SwiftCraftLauncherApp {
         }
         .defaultSize(width: 500, height: 600)
 
-        // 统一下载进度窗口 (Java运行时 + 游戏下载)
+        // Java 下载窗口
         Window("global_resource.download".localized(), id: WindowID.javaDownload.rawValue) {
-            DownloadProgressWindowContent()
+            JavaDownloadWindowContent()
                 .preferredColorScheme(nil)
                 .windowStyleConfig(for: .javaDownload)
                 .windowCleanup(for: .javaDownload)
         }
         .defaultSize(width: 400, height: 100)
+
+        // 游戏下载窗口
+        Window("game.download.progress".localized(), id: WindowID.gameDownload.rawValue) {
+            GameDownloadProgressWindowContent()
+                .preferredColorScheme(nil)
+                .windowStyleConfig(for: .gameDownload)
+                .windowCleanup(for: .gameDownload)
+        }
+        .defaultSize(width: 400, height: 120)
 
         // 皮肤预览窗口
         Window("skin.preview".localized(), id: WindowID.skinPreview.rawValue) {
@@ -66,16 +75,62 @@ extension SwiftCraftLauncherApp {
 
 // MARK: - 窗口内容视图
 
-/// 统一下载进度窗口内容视图
-private struct DownloadProgressWindowContent: View {
-    @ObservedObject private var progressManager: DownloadProgressManager
+private struct JavaDownloadWindowContent: View {
+    @ObservedObject private var javaDownloadManager: JavaDownloadManager
 
-    init(progressManager: DownloadProgressManager = DownloadProgressManager.shared) {
-        _progressManager = ObservedObject(wrappedValue: progressManager)
+    init(javaDownloadManager: JavaDownloadManager = AppServices.javaDownloadManager) {
+        _javaDownloadManager = ObservedObject(wrappedValue: javaDownloadManager)
     }
 
     var body: some View {
-        DownloadProgressWindow(progressManager: progressManager)
+        JavaDownloadProgressWindow(downloadState: javaDownloadManager.downloadState)
+    }
+}
+
+/// 游戏下载进度窗口内容视图
+private struct GameDownloadProgressWindowContent: View {
+    @ObservedObject private var gameCreationManager: GameCreationManager
+
+    init(gameCreationManager: GameCreationManager = AppServices.gameCreationManager) {
+        _gameCreationManager = ObservedObject(wrappedValue: gameCreationManager)
+    }
+
+    var body: some View {
+        VStack(spacing: 12) {
+            HStack(spacing: 12) {
+                if let game = gameCreationManager.creatingGame {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(game.gameName)")
+                            .font(.headline.weight(.semibold))
+                        if !gameCreationManager.currentDownloadFile.isEmpty {
+                            Text(gameCreationManager.currentDownloadFile)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                    Spacer()
+                    Text("\(Int(gameCreationManager.downloadProgress * 100))%")
+                        .font(.caption.weight(.semibold))
+                        .foregroundColor(.secondary)
+                }
+            }
+            ProgressView(value: gameCreationManager.downloadProgress)
+                .progressViewStyle(.linear)
+            HStack(spacing: 12) {
+                Button("取消") {
+                    gameCreationManager.cancelGameCreation()
+                }
+                .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("后台运行") {
+                    // 不需要做什么，只是关闭窗口
+                    // 下载会继续在后台进行
+                }
+            }
+            .font(.caption.weight(.semibold))
+        }
+        .padding(16)
     }
 }
 

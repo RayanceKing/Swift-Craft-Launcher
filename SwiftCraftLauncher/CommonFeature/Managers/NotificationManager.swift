@@ -1,6 +1,7 @@
 import Foundation
 import UserNotifications
 import os
+import AppKit
 
 // MARK: - Notification Center Delegate
 
@@ -24,11 +25,20 @@ enum NotificationManager {
     ///   - title: 通知标题
     ///   - body: 通知内容
     /// - Throws: GlobalError 当操作失败时
-    static func send(title: String, body: String) async throws {
+    static func send(title: String, body: String, attachmentFileURL: URL? = nil) async throws {
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
         content.sound = .default
+
+        if let fileURL = attachmentFileURL {
+            do {
+                let attachment = try UNNotificationAttachment(identifier: "avatar", url: fileURL, options: nil)
+                content.attachments = [attachment]
+            } catch {
+                Logger.shared.warning("创建通知附件失败: \(error.localizedDescription)")
+            }
+        }
 
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -53,9 +63,9 @@ enum NotificationManager {
     /// - Parameters:
     ///   - title: 通知标题
     ///   - body: 通知内容
-    static func sendSilently(title: String, body: String) async {
+    static func sendSilently(title: String, body: String, attachmentFileURL: URL? = nil) async {
         do {
-            try await send(title: title, body: body)
+            try await send(title: title, body: body, attachmentFileURL: attachmentFileURL)
         } catch {
             let globalError = GlobalError.from(error)
             Logger.shared.error("发送通知失败: \(globalError.chineseMessage)")

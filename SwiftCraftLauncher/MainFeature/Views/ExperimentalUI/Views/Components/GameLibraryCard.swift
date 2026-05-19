@@ -5,16 +5,19 @@ struct GameLibraryCard: View {
     let isHovered: Bool
     let onSelect: () -> Void
     let onLaunch: () -> Void
+    let onDelete: () -> Void
+    let onOpenSettings: () -> Void
+    let onExport: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(alignment: .top, spacing: 16) {
-                gameArtwork
-                    .frame(width: 72, height: 72)
-                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    .shadow(color: .black.opacity(0.14), radius: 4, y: 2)
+                VStack(alignment: .center, spacing: 6) {
+                    gameArtwork
+                        .frame(width: 72, height: 72)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .shadow(color: .black.opacity(0.14), radius: 4, y: 2)
 
-                VStack(alignment: .leading, spacing: 8) {
                     if !game.modLoader.isEmpty && game.modLoader != "vanilla" {
                         Text(game.modLoader.capitalized)
                             .font(.caption2.weight(.semibold))
@@ -23,7 +26,9 @@ struct GameLibraryCard: View {
                             .background(Capsule().fill(Color.white.opacity(0.08)))
                             .foregroundStyle(.secondary)
                     }
+                }
 
+                VStack(alignment: .leading, spacing: 8) {
                     Text(game.gameName)
                         .font(.headline.weight(.semibold))
                         .lineLimit(2)
@@ -75,6 +80,15 @@ struct GameLibraryCard: View {
         .animation(.easeInOut(duration: 0.18), value: isHovered)
         .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .onTapGesture(perform: onSelect)
+        .contextMenu {
+            GameContextMenu(
+                game: game,
+                onDelete: onDelete,
+                onOpenSettings: onOpenSettings,
+                onExport: onExport,
+                showsShowInLauncher: true
+            )
+        }
     }
 
     @ViewBuilder private var gameArtwork: some View {

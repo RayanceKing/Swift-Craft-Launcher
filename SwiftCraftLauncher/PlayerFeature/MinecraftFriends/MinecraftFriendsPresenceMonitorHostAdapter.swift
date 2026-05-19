@@ -1,5 +1,6 @@
 import Foundation
 import MinecraftFriendsKit
+import AppKit
 
 @MainActor
 final class MinecraftFriendsPresenceMonitorHostAdapter: MinecraftFriendsPresenceMonitorHost {
@@ -45,6 +46,11 @@ final class MinecraftFriendsPresenceMonitorHostAdapter: MinecraftFriendsPresence
     }
 
     func sendSilentNotification(title: String, body: String) async {
-        await NotificationManager.sendSilently(title: title, body: body)
+        guard let avatar = player?.avatarName else {
+            await NotificationManager.sendSilently(title: title, body: body)
+            return
+        }
+        let attachmentURL = await AvatarCache.cachedAvatarURL(for: avatar)
+        await NotificationManager.sendSilently(title: title, body: body, attachmentFileURL: attachmentURL)
     }
 }
