@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xcodebuild -project SwiftCraftLauncher.xcodeproj -scheme SwiftCraftLauncher -configuration Debug -destination \"platform=macOS\" build)",
+      "Bash(git fetch *)",
+      "Bash(git merge *)",
+      "Bash(xcodebuild -project SwiftCraftLauncher.xcodeproj -scheme SwiftCraftLauncher -configuration Debug -destination \"platform=macOS\" clean build)"
+    ]
+  }
+}

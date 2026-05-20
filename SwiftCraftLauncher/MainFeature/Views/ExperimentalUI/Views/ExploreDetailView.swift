@@ -4,12 +4,10 @@ import SwiftUI
 struct ExploreDetailView: View {
     let item: ModpackHeroItem
     let onDismiss: () -> Void
+    @EnvironmentObject private var gameRepository: GameRepository
     @State private var projectDetail: ModrinthProjectDetail?
-    @State private var versions: [ModrinthProjectDetailVersion] = []
     @State private var isLoading = true
-    @State private var showInstallSheet = false
-    @State private var selectedGameVersion = ""
-    @State private var selectedVersion: ModrinthProjectDetailVersion?
+    @State private var installSheetData: InstallSheetData?
     @State private var palette = ExploreDetailPalette.fallback
 
     var body: some View {
@@ -31,8 +29,25 @@ struct ExploreDetailView: View {
             .task {
                 await loadDetail()
             }
-            .sheet(isPresented: $showInstallSheet) {
-                versionSelectionSheet
+            .sheet(item: $installSheetData) { data in
+                GlobalResourceSheet(
+                    project: data.project,
+                    resourceType: ResourceType.mod.rawValue,
+                    isPresented: Binding(
+                        get: { installSheetData != nil },
+                        set: { isPresented in
+                            if !isPresented {
+                                installSheetData = nil
+                            }
+                        }
+                    ),
+                    preloadedDetail: data.detail,
+                    preloadedCompatibleGames: data.compatibleGames
+                )
+                .environmentObject(gameRepository)
+                .onDisappear {
+                    installSheetData = nil
+                }
             }
             .toolbar {
                 ToolbarItem(placement: .navigation) {
@@ -42,61 +57,6 @@ struct ExploreDetailView: View {
                 }
             }
         }
-    }
-
-    private var versionSelectionSheet: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("resource.install.version_select".localized())
-                    .font(.headline)
-                Spacer()
-                Button("common.cancel".localized()) {
-                    showInstallSheet = false
-                }
-                .buttonStyle(.borderless)
-            }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            Divider()
-            if versions.isEmpty {
-                Spacer()
-                ProgressView().controlSize(.small)
-                Spacer()
-            } else {
-                List(versions) { version in
-                    Button {
-                        selectedVersion = version
-                        showInstallSheet = false
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(version.name)
-                                    .font(.body.weight(.medium))
-                                if !version.gameVersions.isEmpty {
-                                    Text(version.gameVersions.joined(separator: ", "))
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                        .lineLimit(1)
-                                }
-                            }
-                            Spacer()
-                            if let loader = version.loaders.first {
-                                Text(loader)
-                                    .font(.caption2)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 2)
-                                    .background(Color.secondary.opacity(0.12))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .frame(minHeight: 300)
-            }
-        }
-        .frame(width: 420, height: 400)
     }
 
     private var compactHeader: some View {
@@ -289,7 +249,9 @@ struct ExploreDetailView: View {
     // MARK: - Actions
 
     private func handleInstall() {
-        showInstallSheet = true
+        Task {
+            await prepareInstallSheet()
+        }
     }
 
     // MARK: - Data
@@ -297,12 +259,29 @@ struct ExploreDetailView: View {
     private func loadDetail() async {
         do {
             let detail = await ModrinthService.fetchProjectDetails(id: item.id)
-            let vers = await ModrinthService.fetchProjectVersions(id: item.id)
             await MainActor.run {
                 projectDetail = detail
-                versions = vers
                 isLoading = false
             }
+        }
+    }
+
+    private func prepareInstallSheet() async {
+        guard let result = await ResourceDetailLoader.loadProjectDetail(
+            projectId: item.id,
+            gameRepository: gameRepository,
+            resourceType: ResourceType.mod.rawValue
+        ) else {
+            return
+        }
+
+        await MainActor.run {
+            projectDetail = result.detail
+            installSheetData = InstallSheetData(
+                project: ModrinthProject.from(detail: result.detail),
+                detail: result.detail,
+                compatibleGames: result.compatibleGames
+            )
         }
     }
 
@@ -418,6 +397,13 @@ struct ExploreDetailView: View {
             "\(count)"
         }
     }
+}
+
+private struct InstallSheetData: Identifiable {
+    let id = UUID()
+    let project: ModrinthProject
+    let detail: ModrinthProjectDetail
+    let compatibleGames: [GameVersionInfo]
 }
 
 private struct ExploreDetailPalette {
