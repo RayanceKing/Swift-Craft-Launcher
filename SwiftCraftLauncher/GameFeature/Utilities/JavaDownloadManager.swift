@@ -147,7 +147,6 @@ class JavaDownloadManager: ObservableObject {
     /// 清理取消的下载数据
     func cleanupCancelledDownload() {
         Logger.shared.info("Cleaning up cancelled Java download for version: \(downloadState.version)")
-        removeActiveTask()
-        downloadState.reset()
+        closeWindow()
     }
 }

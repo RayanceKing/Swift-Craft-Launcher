@@ -35,6 +35,7 @@ struct SwiftCraftLauncherApp: App {
     @StateObject var gameRepository = GameRepository()
     @StateObject var gameLaunchUseCase = GameLaunchUseCase()
     @StateObject var generalSettingsManager: GeneralSettingsManager
+    @StateObject var themeManager: ThemeManager
 
     @Environment(\.openSettings)
     private var openSettings
@@ -44,6 +45,7 @@ struct SwiftCraftLauncherApp: App {
 
     init() {
         _generalSettingsManager = StateObject(wrappedValue: AppServices.generalSettingsManager)
+        _themeManager = StateObject(wrappedValue: AppServices.themeManager)
 
         Self.configureURLCache()
         Self.configureNotifications(delegate: notificationCenterDelegate)
@@ -53,14 +55,14 @@ struct SwiftCraftLauncherApp: App {
 
     // MARK: - Body
     var body: some Scene {
-        Window(Bundle.main.appName, id: WindowID.main.rawValue) {
+        Window(Bundle.main.appName, id: AppWindowID.main.rawValue) {
             MainView()
                 .environmentObject(playerListViewModel)
                 .environmentObject(gameRepository)
                 .environmentObject(gameLaunchUseCase)
                 .environmentObject(AppServices.gameActionManager)
                 .environmentObject(AppServices.gameStatusManager)
-                .preferredColorScheme(nil)
+                .preferredColorScheme(themeManager.preferredColorScheme)
                 .errorAlert()
                 .windowOpener()
                 .onOpenURL { url in
@@ -86,17 +88,15 @@ struct SwiftCraftLauncherApp: App {
             SettingsView()
                 .environmentObject(playerListViewModel)
                 .environmentObject(gameRepository)
-                .preferredColorScheme(nil)
+                .preferredColorScheme(themeManager.preferredColorScheme)
                 .errorAlert()
         }
 
-        // 应用窗口组
-        appWindowGroups()
+        auxiliaryWindowGroup()
             .windowStyle(.titleBar)
             .applyRestorationBehaviorDisabled()
             .windowResizability(.contentSize)
 
-        // 右上角的状态栏(可以显示图标的)
         MenuBarExtra(
             content: {
                 MenuBarExtraContentView {
@@ -138,7 +138,6 @@ struct SwiftCraftLauncherApp: App {
     }
 
     private func cleanupWindowDataOnLaunch() {
-        // 应用启动时清理所有窗口数据
         AppServices.windowDataStore.cleanup(for: .aiChat)
         AppServices.windowDataStore.cleanup(for: .skinPreview)
     }

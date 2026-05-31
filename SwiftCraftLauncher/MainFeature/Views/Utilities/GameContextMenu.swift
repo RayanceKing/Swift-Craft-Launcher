@@ -1,7 +1,5 @@
 import SwiftUI
 
-/// 游戏右键菜单组件，优化内存使用
-/// 使用独立的视图组件和缓存的状态，减少内存占用
 struct GameContextMenu: View {
     let game: GameVersionInfo
     let onDelete: () -> Void
@@ -64,7 +62,7 @@ struct GameContextMenu: View {
         if showsShowInLauncher {
             Button(action: {
                 selectedGameManager.setSelectedGame(game.id)
-                windowManager.showAndActivateWindow(id: .main)
+                windowManager.showAndActivateMainWindow()
             }, label: {
                 Label("sidebar.context_menu.show_in_launcher".localized(), systemImage: "macwindow")
             })
@@ -72,7 +70,7 @@ struct GameContextMenu: View {
 
         Button(action: {
             selectedGameManager.setSelectedGameAndOpenAdvancedSettings(game.id)
-            windowManager.showAndActivateWindow(id: .main)
+            windowManager.showAndActivateMainWindow()
             onOpenSettings()
         }, label: {
             Label("settings.game.advanced".localized(), systemImage: "gearshape")
@@ -83,7 +81,7 @@ struct GameContextMenu: View {
         if game.modLoader != GameLoader.vanilla.displayName {
             Button(action: {
                 if showsShowInLauncher {
-                    windowManager.showAndActivateWindow(id: .main)
+                    windowManager.showAndActivateMainWindow()
                 }
                 onExport()
             }, label: {
@@ -93,7 +91,7 @@ struct GameContextMenu: View {
 
         Button(action: {
             if showsShowInLauncher {
-                windowManager.showAndActivateWindow(id: .main)
+                windowManager.showAndActivateMainWindow()
             }
             onDelete()
         }, label: {

@@ -20,6 +20,7 @@ enum AppConstants {
         // Player settings
         static let currentPlayerId = "currentPlayerId"
         static let enableOfflineLogin = "enableOfflineLogin"
+        static let enableEphemeralWebLogin = "enableEphemeralWebLogin"
         static let defaultYggdrasilServerBaseURL = "defaultYggdrasilServerBaseURL"
         static let enableHistorySkinLibrary = "enableHistorySkinLibrary"
         static let enableMinecraftFriendsPresenceNotifications = "enableMinecraftFriendsPresenceNotifications"
@@ -51,6 +52,8 @@ enum AppConstants {
         static let useExperimentalUI = "useExperimentalUI"
         static let defaultModPackExportFormat = "defaultModPackExportFormat"
         static let acknowledgedAnnouncementVersion = "acknowledgedAnnouncementVersion"
+        // Theme
+        static let themeMode = "themeMode"
     }
 
     // MARK: - Keychain Keys
