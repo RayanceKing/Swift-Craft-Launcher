@@ -119,3 +119,17 @@ private struct SkinPreviewWindowContent: View {
         }
     }
 }
+
+private struct JavaDownloadWindowContent: View {
+    @ObservedObject private var downloadState: JavaDownloadState
+    private let javaDownloadManager: JavaDownloadManager
+
+    init(javaDownloadManager: JavaDownloadManager = AppServices.javaDownloadManager) {
+        self.javaDownloadManager = javaDownloadManager
+        _downloadState = ObservedObject(wrappedValue: javaDownloadManager.downloadState)
+    }
+
+    var body: some View {
+        JavaDownloadProgressWindow(downloadState: downloadState, javaDownloadManager: javaDownloadManager)
+    }
+}

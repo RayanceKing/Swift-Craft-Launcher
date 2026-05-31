@@ -10,7 +10,8 @@ struct ExploreView: View {
     private let resourceTypes = ResourceType.allCases
 
     var body: some View {
-        Group {
+        ZStack {
+            // Main content stays in hierarchy to preserve scroll position
             if contentStore.isExploreLoading {
                 VStack {
                     Spacer()
@@ -18,19 +19,29 @@ struct ExploreView: View {
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if let detailItem = selectedDetailItem {
+            } else {
+                mainContent
+            }
+
+            // Detail overlay — layered on top so mainContent scroll state is retained
+            if let detailItem = selectedDetailItem {
                 ExploreDetailView(
                     item: detailItem,
                     onDismiss: { selectedDetailItem = nil }
                 )
-            } else if let filterType = selectedTypeForFilter {
+                .transition(.move(edge: .trailing))
+                .zIndex(1)
+            }
+
+            // Filter overlay — needs explicit background to cover mainContent
+            if let filterType = selectedTypeForFilter {
                 ExploreFilterView(
                     resourceType: filterType,
                     onDismiss: { selectedTypeForFilter = nil }
                 )
+                .background(Color(.windowBackgroundColor))
                 .transition(.move(edge: .trailing))
-            } else {
-                mainContent
+                .zIndex(1)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: selectedTypeForFilter != nil)

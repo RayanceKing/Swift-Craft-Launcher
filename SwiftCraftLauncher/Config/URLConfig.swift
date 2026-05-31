@@ -127,6 +127,11 @@ enum URLConfig {
             static let javaRuntimeBeta = URLConfig.url("https://cdn.azul.com/zulu/bin/zulu17.60.17-ca-jre17.0.16-macosx_x64.zip")
         }
 
+        // Minecraft 会话服务器
+        enum Minecraft {
+            static let mojangSessionProfileBase = URLConfig.url("https://sessionserver.mojang.com/session/minecraft/profile")
+        }
+
         // 第三方认证相关
         enum AuthlibInjector {
             static let download = URLConfig.applyGitProxyIfNeeded(

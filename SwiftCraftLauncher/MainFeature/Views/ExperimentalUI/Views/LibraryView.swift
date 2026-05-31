@@ -24,7 +24,54 @@ struct LibraryView: View {
     ]
 
     var body: some View {
-        Group {
+        ZStack {
+            // Main content stays in hierarchy to preserve scroll position
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    headerView
+
+                    if gameRepository.games.isEmpty {
+                        emptyLibrary
+                    } else {
+                        LazyVGrid(columns: columns, spacing: 20) {
+                            ForEach(gameRepository.games) { game in
+                                GameLibraryCard(
+                                    game: game,
+                                    isHovered: hoveredGameId == game.id,
+                                    onSelect: {
+                                        openGameDetail(game)
+                                    },
+                                    onLaunch: {
+                                        launchGame(game)
+                                    },
+                                    onDelete: {
+                                        gameDialogsPresenter.requestGameDeletion(of: game)
+                                    },
+                                    onOpenSettings: {
+                                        openSettings()
+                                    },
+                                    onExport: {
+                                        gameDialogsPresenter.presentModPackExport(for: game)
+                                    }
+                                )
+                                .onHover { hovering in
+                                    hoveredGameId = hovering ? game.id : nil
+                                }
+                            }
+                            if gameCreationManager.isCreatingGame, let creatingGame = gameCreationManager.creatingGame {
+                                gameCreationPlaceholder(creatingGame)
+                            }
+                        }
+                        .padding(.bottom, 12)
+                    }
+                }
+                .padding(.horizontal, 28)
+                .padding(.top, 36)
+                .padding(.bottom, 28)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Detail overlay — layered on top so library grid scroll state is retained
             if let game = selectedGameForDetail {
                 GameLibraryDetailView(
                     game: game,
@@ -35,51 +82,9 @@ struct LibraryView: View {
                     onLaunch: { launchGame(game) }
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-                        headerView
-
-                        if gameRepository.games.isEmpty {
-                            emptyLibrary
-                        } else {
-                            LazyVGrid(columns: columns, spacing: 20) {
-                                ForEach(gameRepository.games) { game in
-                                    GameLibraryCard(
-                                        game: game,
-                                        isHovered: hoveredGameId == game.id,
-                                        onSelect: {
-                                            openGameDetail(game)
-                                        },
-                                        onLaunch: {
-                                            launchGame(game)
-                                        },
-                                        onDelete: {
-                                            gameDialogsPresenter.requestGameDeletion(of: game)
-                                        },
-                                        onOpenSettings: {
-                                            openSettings()
-                                        },
-                                        onExport: {
-                                            gameDialogsPresenter.presentModPackExport(for: game)
-                                        }
-                                    )
-                                    .onHover { hovering in
-                                        hoveredGameId = hovering ? game.id : nil
-                                    }
-                                }
-                                if gameCreationManager.isCreatingGame, let creatingGame = gameCreationManager.creatingGame {
-                                    gameCreationPlaceholder(creatingGame)
-                                }
-                            }
-                            .padding(.bottom, 12)
-                        }
-                    }
-                    .padding(.horizontal, 28)
-                    .padding(.top, 36)
-                    .padding(.bottom, 28)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.windowBackgroundColor))
+                .transition(.move(edge: .trailing))
+                .zIndex(1)
             }
         }
         .onChange(of: gameRepository.games.count) { _, _ in
